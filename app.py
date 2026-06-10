@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, make_response
 from difflib import SequenceMatcher
 import json, re, os
+from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
@@ -9,17 +10,66 @@ with open(os.path.join(BASE_DIR, "questions.json"), encoding="utf-8") as f:
     QUESTIONS = json.load(f)
 
 PASS_THRESHOLD = 85
-students = {}   # sid -> session dict
+students = {}
 
 
+# ── Google Sheets logging ────────────────────────────────────
+def _get_sheet():
+    """Return the first sheet of the configured Google Spreadsheet, or None."""
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+    sheet_id   = os.environ.get("GOOGLE_SHEET_ID")
+    if not creds_json or not sheet_id:
+        return None
+    try:
+        import gspread
+        creds = json.loads(creds_json)
+        gc    = gspread.service_account_from_dict(creds)
+        return gc.open_by_key(sheet_id).sheet1
+    except Exception:
+        return None
+
+
+def _ensure_header(sheet):
+    """Add header row if the sheet is empty."""
+    try:
+        if not sheet.get_all_values():
+            sheet.append_row([
+                "Timestamp", "Student", "Sentence",
+                "Score", "Passed", "Attempts", "Mastery Reps"
+            ])
+    except Exception:
+        pass
+
+
+def log_result(student_name, sentence, score, passed, attempts, mastery_reps):
+    """Write one completed sentence to Google Sheets (silently fails if not configured)."""
+    try:
+        sheet = _get_sheet()
+        if sheet is None:
+            return
+        _ensure_header(sheet)
+        sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            student_name,
+            sentence,
+            score,
+            "Yes" if passed else "No",
+            attempts,
+            mastery_reps,
+        ])
+    except Exception:
+        pass   # Never let logging break the app
+
+
+# ── Session helpers ──────────────────────────────────────────
 def new_session(name):
     return {
         "name":            name,
         "current":         0,
-        "failed_attempts": 0,   # failures on current sentence
-        "mastery_needed":  0,   # correct reps still required
-        "mastery_score":   0,   # score when first passed
-        "sentences":       [],  # completed sentence records
+        "failed_attempts": 0,
+        "mastery_needed":  0,
+        "mastery_score":   0,
+        "sentences":       [],
         "completed":       False,
     }
 
@@ -52,6 +102,7 @@ def word_level(spoken, correct):
     return result
 
 
+# ── Routes ───────────────────────────────────────────────────
 @app.route("/question")
 def get_question():
     sid = request.args.get("student", "guest")
@@ -88,39 +139,38 @@ def post_answer():
     base = dict(correct=correct, spoken=spoken, words=words,
                 threshold=PASS_THRESHOLD, score=score, passed=passed)
 
-    # ── Mastery reinforcement mode ──────────────────────────────
+    def record_and_advance(attempts, mastery_reps, final_score):
+        """Save sentence, log to Sheets, advance counter."""
+        rec = {"sentence": correct, "score": final_score,
+               "passed": True, "attempts": attempts, "mastery_reps": mastery_reps}
+        s["sentences"].append(rec)
+        log_result(s["name"], correct, final_score, True, attempts, mastery_reps)
+        s["current"]        += 1
+        s["failed_attempts"] = 0
+        s["mastery_score"]   = 0
+
+    # ── Mastery mode ─────────────────────────────────────────
     if s["mastery_needed"] > 0:
         if passed:
             s["mastery_needed"] -= 1
             if s["mastery_needed"] == 0:
-                # Mastery complete → record + advance
-                s["sentences"].append({
-                    "sentence":    correct,
-                    "score":       s["mastery_score"],
-                    "passed":      True,
-                    "attempts":    s["failed_attempts"] + 1,
-                    "mastery_reps": s["failed_attempts"],
-                })
-                s["current"]        += 1
-                s["failed_attempts"] = 0
-                s["mastery_score"]   = 0
+                record_and_advance(
+                    attempts     = s["failed_attempts"] + 1,
+                    mastery_reps = s["failed_attempts"],
+                    final_score  = s["mastery_score"],
+                )
                 return jsonify({**base, "mastery_mode": False,
                                 "mastery_needed": 0, "advance": True})
         return jsonify({**base, "mastery_mode": True,
                         "mastery_needed": s["mastery_needed"], "advance": False})
 
-    # ── Normal mode ─────────────────────────────────────────────
+    # ── Normal mode ───────────────────────────────────────────
     if passed:
         if s["failed_attempts"] == 0:
-            # Perfect on first try
-            s["sentences"].append({"sentence": correct, "score": score,
-                                   "passed": True, "attempts": 1, "mastery_reps": 0})
-            s["current"]        += 1
-            s["failed_attempts"] = 0
+            record_and_advance(attempts=1, mastery_reps=0, final_score=score)
             return jsonify({**base, "mastery_mode": False,
                             "mastery_needed": 0, "advance": True})
         else:
-            # First pass after failures → enter mastery
             s["mastery_needed"] = s["failed_attempts"]
             s["mastery_score"]  = score
             return jsonify({**base, "mastery_mode": True, "first_pass": True,
