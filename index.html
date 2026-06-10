@@ -261,7 +261,12 @@ function startSession() {
   studentName = name;
   document.getElementById("name-overlay").style.display = "none";
   document.getElementById("student-tag").textContent = "👤 " + name;
-  loadQuestion();
+  // Always start fresh — reset any existing session for this name
+  fetch("/reset", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({student: studentName})
+  }).then(function() { loadQuestion(); });
 }
 
 /* ── Session ─────────────────────────────────────────────── */
