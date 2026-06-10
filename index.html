@@ -10,13 +10,42 @@
   --p:#4318D1; --p2:#6b4df0; --p3:#ede7ff;
   --green:#2e7d32; --green2:#4CAF50; --green3:#e8f5e9;
   --red:#c62828; --red2:#ef5350; --red3:#ffebee;
-  --orange:#e65100; --orange3:#fff3e0;
+  --orange:#e65100; --orange2:#FF9800; --orange3:#fff3e0;
   --bg:#F4F2FF; --card:#fff; --text:#1a1033; --muted:#888;
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'Sora',sans-serif; background:var(--bg); color:var(--text);
   min-height:100vh; display:flex; flex-direction:column; align-items:center; }
 
+/* ── Name entry overlay ───────────────────────────────────── */
+#name-overlay {
+  position:fixed; inset:0; background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  z-index:200; padding:24px;
+}
+.name-card {
+  background:#fff; border-radius:24px; padding:44px 36px;
+  max-width:420px; width:100%; text-align:center;
+  box-shadow:0 8px 40px rgba(67,24,209,.15);
+  border:1px solid rgba(67,24,209,.08);
+}
+.name-card .logo-big {
+  width:64px; height:64px; border-radius:50%;
+  background:linear-gradient(135deg,#4318D1,#7c3aed);
+  display:grid; place-items:center; margin:0 auto 16px;
+  font-size:26px; font-weight:800; color:#fff;
+}
+.name-card h2 { font-size:24px; font-weight:800; color:var(--p); margin-bottom:6px; }
+.name-card p  { font-size:14px; color:var(--muted); margin-bottom:28px; }
+.name-input {
+  width:100%; padding:13px 16px; border:2px solid #e0d9ff;
+  border-radius:12px; font-family:'Sora',sans-serif; font-size:16px;
+  color:var(--text); outline:none; margin-bottom:16px;
+  transition:border-color .2s;
+}
+.name-input:focus { border-color:var(--p); }
+
+/* ── Header ─────────────────────────────────────────────────── */
 header { width:100%; background:linear-gradient(110deg,#2d0f8f,#4318D1 60%,#7c3aed);
   color:#fff; padding:0 28px; height:60px; display:flex; align-items:center; gap:14px;
   box-shadow:0 2px 16px rgba(67,24,209,.3); }
@@ -25,7 +54,13 @@ header { width:100%; background:linear-gradient(110deg,#2d0f8f,#4318D1 60%,#7c3a
   font-size:16px; font-weight:800; }
 header h1 { font-size:20px; font-weight:800; }
 header p  { font-size:11px; opacity:.7; margin-top:1px; }
+.student-tag {
+  margin-left:auto; background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.3); border-radius:20px;
+  padding:4px 12px; font-size:12px; font-weight:600;
+}
 
+/* ── Progress ─────────────────────────────────────────────── */
 .progress-wrap { width:100%; max-width:640px; padding:18px 0 0; }
 .progress-track { background:#ddd; border-radius:20px; height:6px; }
 .progress-fill  { background:linear-gradient(90deg,var(--p),var(--p2));
@@ -33,6 +68,7 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 .progress-label { font-size:12px; color:var(--muted); text-align:right;
   margin-bottom:6px; font-weight:600; }
 
+/* ── Card ─────────────────────────────────────────────────── */
 .card { background:var(--card); border-radius:20px; padding:28px 30px;
   box-shadow:0 6px 28px rgba(67,24,209,.10); width:100%; max-width:640px;
   margin-top:18px; border:1px solid rgba(67,24,209,.07); }
@@ -62,6 +98,7 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
   box-shadow:0 4px 18px rgba(67,24,209,.35); transition:.2s; margin:0 auto 12px; }
 .mic-btn:hover { background:var(--p2); transform:scale(1.05); }
 .mic-btn.listening { background:var(--red2); animation:pulse-mic 1.1s infinite; }
+.mic-btn.mastery-active { background:#FF9800; box-shadow:0 4px 18px rgba(255,152,0,.4); }
 .mic-btn svg { width:32px; height:32px; fill:#fff; }
 @keyframes pulse-mic {
   0%,100% { box-shadow:0 0 0 0 rgba(239,83,80,.45); }
@@ -101,21 +138,55 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 .result-banner h3 { font-size:16px; font-weight:700; margin-bottom:2px; }
 .result-banner p  { font-size:13px; color:#555; }
 
+/* ── Mastery banner ───────────────────────────────────────── */
+#mastery-banner {
+  background:var(--orange3); border:2px solid var(--orange2);
+  border-radius:14px; padding:16px 18px; margin-top:14px; display:none;
+}
+#mastery-banner.visible { display:block; }
+#mastery-banner h3 {
+  font-size:15px; font-weight:700; color:var(--orange); margin-bottom:4px;
+}
+#mastery-banner p { font-size:13px; color:#7a4000; margin-bottom:12px; }
+.mastery-dots { display:flex; gap:8px; flex-wrap:wrap; }
+.m-dot {
+  width:24px; height:24px; border-radius:50%;
+  border:2.5px solid var(--orange2); background:#ffe0b2;
+  transition:background .3s;
+}
+.m-dot.done { background:var(--orange2); }
+
+/* ── Done screen ──────────────────────────────────────────── */
+.done-screen { text-align:center; padding:10px 0; }
+.done-screen h2 { font-size:28px; font-weight:800; color:var(--p); margin-bottom:8px; }
+.done-screen p  { font-size:15px; color:var(--muted); margin-bottom:24px; }
+
 .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;
   font-size:12px; color:var(--muted); }
 .legend span { display:flex; align-items:center; gap:4px; }
 .dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
-
-.done-screen { text-align:center; padding:10px 0; }
-.done-screen h2 { font-size:28px; font-weight:800; color:var(--p); margin-bottom:8px; }
-.done-screen p  { font-size:15px; color:var(--muted); margin-bottom:24px; }
 </style>
 </head>
 <body>
 
+<!-- ── Name entry overlay ── -->
+<div id="name-overlay">
+  <div class="name-card">
+    <div class="logo-big">E</div>
+    <h2>Welcome to EZRA</h2>
+    <p>English Speech Practice — powered by Bloom's Mastery</p>
+    <input class="name-input" id="name-input" type="text"
+           placeholder="Enter your name..." maxlength="40"
+           onkeydown="if(event.key==='Enter') startSession()">
+    <button class="btn btn-p" style="width:100%;padding:13px;font-size:16px"
+            onclick="startSession()">Start Practice →</button>
+  </div>
+</div>
+
 <header>
   <div class="logo">E</div>
   <div><h1>EZRA</h1><p>Speech Practice Demo</p></div>
+  <div class="student-tag" id="student-tag"></div>
 </header>
 
 <div class="progress-wrap">
@@ -159,6 +230,13 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
     </div>
   </div>
 
+  <!-- Mastery reinforcement banner -->
+  <div id="mastery-banner">
+    <h3>&#127942; Mastery Mode — Benjamin Bloom</h3>
+    <p id="mastery-msg">Say the sentence correctly to reinforce the habit.</p>
+    <div class="mastery-dots" id="mastery-dots"></div>
+  </div>
+
   <div class="result-banner" id="result-banner">
     <div class="icon" id="result-icon"></div>
     <div>
@@ -171,75 +249,32 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 <div class="card" id="done-card" style="display:none"></div>
 
 <script>
-var currentQ = null;
-var waiting  = false;
+var studentName  = "";
+var currentQ     = null;
+var waiting      = false;
+var masteryTotal = 0;   // how many mastery reps were required at the start
 
-function showDoneScreen(q) {
-  document.getElementById("main-card").style.display = "none";
-  var done = document.getElementById("done-card");
-  done.style.display = "block";
+/* ── Name entry ─────────────────────────────────────────── */
+function startSession() {
+  var name = document.getElementById("name-input").value.trim();
+  if (!name) { document.getElementById("name-input").focus(); return; }
+  studentName = name;
+  document.getElementById("name-overlay").style.display = "none";
+  document.getElementById("student-tag").textContent = "👤 " + name;
+  loadQuestion();
+}
 
-  var results  = q.results  || [];
-  var passed   = q.passed   || 0;
-  var total    = q.total    || results.length;
-  var avgScore = q.avg_score || 0;
-
-  var color = avgScore >= 85 ? "#4CAF50" : avgScore >= 60 ? "#FF9800" : "#ef5350";
-
-  var rowsHtml = "";
-  for (var i = 0; i < results.length; i++) {
-    var r    = results[i];
-    var sc   = r.score;
-    var rc   = sc >= 85 ? "#4CAF50" : sc >= 60 ? "#FF9800" : "#ef5350";
-    var icon = r.passed ? "&#10003;" : "&#10007;";
-    var ibg  = r.passed ? "#e8f5e9"  : "#ffebee";
-    var ifc  = r.passed ? "#2e7d32"  : "#c62828";
-    rowsHtml +=
-      '<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;' +
-      'border-radius:10px;background:#f8f7ff;border-left:5px solid ' + rc + ';margin-bottom:8px;">' +
-      '<span style="font-size:18px;font-weight:800;color:' + ifc + ';background:' + ibg +
-      ';width:28px;height:28px;border-radius:50%;display:grid;place-items:center;">' + icon + '</span>' +
-      '<span style="flex:1;font-size:14px;color:#1a1033;">' + r.sentence + '</span>' +
-      '<span style="font-size:12px;font-weight:700;color:#fff;background:' + rc +
-      ';padding:3px 10px;border-radius:20px;">' + sc + '%</span>' +
-      '</div>';
-  }
-
-  done.innerHTML =
-    '<div style="text-align:center;padding:8px 0 20px">' +
-      '<div style="font-size:48px;margin-bottom:10px">&#127881;</div>' +
-      '<h2 style="font-size:26px;font-weight:800;color:#4318D1;margin-bottom:6px">Session Complete!</h2>' +
-      '<p style="font-size:14px;color:#888;margin-bottom:20px">Here is how you did:</p>' +
-      '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:24px;flex-wrap:wrap">' +
-        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
-          '<div style="font-size:30px;font-weight:800;color:#4318D1">' + passed + '/' + total + '</div>' +
-          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Passed</div>' +
-        '</div>' +
-        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
-          '<div style="font-size:30px;font-weight:800;color:' + color + '">' + avgScore + '%</div>' +
-          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Avg Score</div>' +
-        '</div>' +
-        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
-          '<div style="font-size:30px;font-weight:800;color:#4318D1">' +
-            Math.round((passed / Math.max(total,1)) * 100) + '%</div>' +
-          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Accuracy</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="text-align:left;margin-bottom:20px">' + rowsHtml + '</div>' +
-      '<button class="btn btn-p" style="width:100%;padding:13px;font-size:16px" ' +
-        'onclick="resetSession()">&#128260; Start Again</button>' +
-    '</div>';
+/* ── Session ─────────────────────────────────────────────── */
+function qs(extra) {
+  return "/question?student=" + encodeURIComponent(studentName) + (extra || "");
 }
 
 function loadQuestion() {
   resetUI();
-  fetch("/question")
+  fetch(qs())
     .then(function(r) { return r.json(); })
     .then(function(q) {
-      if (q.done) {
-        showDoneScreen(q);
-        return;
-      }
+      if (q.done) { showDoneScreen(q); return; }
       currentQ = q;
       document.getElementById("hebrew").textContent      = q.he;
       document.getElementById("english-ref").textContent = q.en;
@@ -247,19 +282,28 @@ function loadQuestion() {
         "Sentence " + (q.index + 1) + " of " + q.total;
       document.getElementById("prog-fill").style.width =
         Math.round((q.index / q.total) * 100) + "%";
-      setTimeout(playSentence, 400);
+
+      if (q.mastery_needed > 0) {
+        // Resuming mid-mastery (e.g. page reload) — restore mastery UI
+        masteryTotal = q.mastery_needed;
+        showMasteryBanner(q.mastery_needed, masteryTotal);
+        // Auto-reveal English in mastery mode
+        document.getElementById("english-ref").style.opacity = "1";
+      } else {
+        setTimeout(playSentence, 400);
+      }
     })
     .catch(function(err) {
       document.getElementById("hebrew").textContent = "Error: " + err.message;
     });
 }
 
+/* ── Play / reveal ───────────────────────────────────────── */
 function playSentence() {
   if (!currentQ) return;
   speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(currentQ.en);
-  u.lang = "en-US";
-  u.rate = 0.9;
+  u.lang = "en-US"; u.rate = 0.9;
   speechSynthesis.speak(u);
 }
 
@@ -268,13 +312,35 @@ function revealEnglish() {
   el.style.opacity = el.style.opacity === "1" ? "0" : "1";
 }
 
+/* ── Mastery banner ──────────────────────────────────────── */
+function showMasteryBanner(remaining, total) {
+  var banner = document.getElementById("mastery-banner");
+  var msg    = document.getElementById("mastery-msg");
+  var dots   = document.getElementById("mastery-dots");
+  banner.classList.add("visible");
+  msg.textContent = remaining === 1
+    ? "One more correct repetition to go!"
+    : "Say it correctly " + remaining + " more time" + (remaining > 1 ? "s" : "") + " to reinforce.";
+  dots.innerHTML = "";
+  for (var i = 0; i < total; i++) {
+    var d = document.createElement("div");
+    d.className = "m-dot" + (i < (total - remaining) ? " done" : "");
+    dots.appendChild(d);
+  }
+  document.getElementById("mic-btn").classList.add("mastery-active");
+}
+
+function hideMasteryBanner() {
+  document.getElementById("mastery-banner").classList.remove("visible");
+  document.getElementById("mic-btn").classList.remove("mastery-active");
+}
+
+/* ── Speech recognition ──────────────────────────────────── */
 function startRecognition() {
   if (waiting) return;
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    alert("Speech Recognition not supported. Please use Chrome or Edge.");
-    return;
-  }
+  if (!SR) { alert("Speech Recognition not supported. Please use Chrome or Edge."); return; }
+
   var rec      = new SR();
   var micBtn   = document.getElementById("mic-btn");
   var micLabel = document.getElementById("mic-label");
@@ -295,18 +361,18 @@ function startRecognition() {
     spokenBox.classList.add("visible");
 
     fetch("/answer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answer: text })
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({student: studentName, answer: text})
     })
     .then(function(r) { return r.json(); })
     .then(function(result) { showResult(result); })
-    .catch(function(err) { micLabel.textContent = "Error - try again"; });
+    .catch(function() { micLabel.textContent = "Error — try again"; });
   };
 
-  rec.onerror = function(e) {
+  rec.onerror = function() {
     micBtn.classList.remove("listening");
-    micLabel.textContent = "Error - try again";
+    micLabel.textContent = "Error — try again";
   };
 
   rec.onend = function() {
@@ -318,10 +384,12 @@ function startRecognition() {
   rec.start();
 }
 
+/* ── Show result ─────────────────────────────────────────── */
 function showResult(result) {
-  var passed = result.passed;
   var score  = result.score;
+  var passed = result.passed;
 
+  // Score bar
   var scoreRow  = document.getElementById("score-row");
   var scoreFill = document.getElementById("score-fill");
   var scoreNum  = document.getElementById("score-num");
@@ -332,6 +400,7 @@ function showResult(result) {
   scoreNum.textContent   = score + "%";
   scoreNum.style.color   = color;
 
+  // Word feedback
   var wfEl = document.getElementById("word-feedback");
   var wlEl = document.getElementById("word-list");
   wfEl.classList.add("visible");
@@ -339,39 +408,77 @@ function showResult(result) {
   for (var i = 0; i < result.words.length; i++) {
     var w   = result.words[i];
     var cls = w.status === "correct" ? "w-correct"
-            : w.status === "wrong"   ? "w-wrong"
-            :                          "w-missing";
+            : w.status === "wrong"   ? "w-wrong" : "w-missing";
     html += '<span class="w ' + cls + '">' + w.word + '</span> ';
   }
   wlEl.innerHTML = html;
 
+  // Result banner + mastery logic
   var banner = document.getElementById("result-banner");
   var icon   = document.getElementById("result-icon");
   var title  = document.getElementById("result-title");
   var sub    = document.getElementById("result-sub");
 
-  banner.className  = "result-banner visible " + (passed ? "pass" : "fail");
-  icon.textContent  = passed ? "OK" : "X";
-  title.textContent = passed ? "Great job!" : score >= 60 ? "Close! Try again." : "Try again.";
-  sub.textContent   = passed
-    ? "Score: " + score + "% - moving to next sentence..."
-    : "Score: " + score + "% - you need " + result.threshold + "% to pass.";
+  if (result.mastery_mode) {
+    if (result.first_pass) {
+      // Just entered mastery — celebrate the pass, show mastery requirement
+      masteryTotal = result.mastery_needed;
+      banner.className  = "result-banner visible pass";
+      icon.textContent  = "✓";
+      title.textContent = "Great job! Now reinforce it.";
+      sub.textContent   = "You passed after " + masteryTotal + " mistake" +
+                          (masteryTotal > 1 ? "s" : "") +
+                          " — say it correctly " + masteryTotal +
+                          " more time" + (masteryTotal > 1 ? "s" : "") + ".";
+      document.getElementById("english-ref").style.opacity = "1";
+    } else if (passed) {
+      banner.className  = "result-banner visible pass";
+      icon.textContent  = "✓";
+      title.textContent = result.mastery_needed === 0 ? "Mastered! ★" : "Keep going!";
+      sub.textContent   = result.mastery_needed + " more rep" +
+                          (result.mastery_needed !== 1 ? "s" : "") + " to go.";
+    } else {
+      banner.className  = "result-banner visible fail";
+      icon.textContent  = "✗";
+      title.textContent = "Not quite — try again.";
+      sub.textContent   = "Score: " + score + "% — need " + result.threshold + "% to count.";
+    }
+    showMasteryBanner(result.mastery_needed, masteryTotal);
 
-  document.getElementById("mic-label").textContent = passed ? "Moving on..." : "Tap to try again";
+    if (result.advance) {
+      hideMasteryBanner();
+      waiting = true;
+      setTimeout(function() { waiting = false; loadQuestion(); }, 1800);
+    } else {
+      document.getElementById("mic-label").textContent =
+        passed ? "Keep going — tap to speak" : "Tap to try again";
+    }
 
-  if (passed) {
-    waiting = true;
-    document.getElementById("english-ref").style.opacity = "1";
-    setTimeout(function() { waiting = false; loadQuestion(); }, 2000);
+  } else {
+    // Normal mode
+    banner.className  = "result-banner visible " + (passed ? "pass" : "fail");
+    icon.textContent  = passed ? "✓" : "✗";
+    title.textContent = passed ? "Great job!"
+                      : score >= 60 ? "Close! Try again." : "Try again.";
+    sub.textContent   = passed
+      ? "Score: " + score + "% — moving to next sentence…"
+      : "Score: " + score + "% — you need " + result.threshold + "% to pass.";
+    document.getElementById("mic-label").textContent =
+      passed ? "Moving on…" : "Tap to try again";
+
+    if (result.advance) {
+      waiting = true;
+      document.getElementById("english-ref").style.opacity = "1";
+      setTimeout(function() { waiting = false; loadQuestion(); }, 2000);
+    }
   }
 }
 
+/* ── Reset UI ────────────────────────────────────────────── */
 function resetUI() {
   var sb = document.getElementById("spoken-box");
-  sb.classList.remove("visible");
-  sb.textContent = "";
-  var wf = document.getElementById("word-feedback");
-  wf.classList.remove("visible");
+  sb.classList.remove("visible"); sb.textContent = "";
+  document.getElementById("word-feedback").classList.remove("visible");
   document.getElementById("word-list").innerHTML = "";
   document.getElementById("score-row").style.display = "none";
   document.getElementById("score-fill").style.width = "0%";
@@ -379,19 +486,88 @@ function resetUI() {
   document.getElementById("result-banner").className = "result-banner";
   document.getElementById("english-ref").style.opacity = "0";
   document.getElementById("mic-label").textContent = "Tap to speak";
-  document.getElementById("mic-btn").classList.remove("listening");
+  document.getElementById("mic-btn").classList.remove("listening", "mastery-active");
+  hideMasteryBanner();
+  masteryTotal = 0;
+}
+
+/* ── Done screen ─────────────────────────────────────────── */
+function showDoneScreen(q) {
+  document.getElementById("main-card").style.display = "none";
+  var done = document.getElementById("done-card");
+  done.style.display = "block";
+
+  var results  = q.results  || [];
+  var passed   = q.passed   || 0;
+  var total    = q.total    || results.length;
+  var avgScore = q.avg_score || 0;
+  var color    = avgScore >= 85 ? "#4CAF50" : avgScore >= 60 ? "#FF9800" : "#ef5350";
+
+  var rowsHtml = "";
+  for (var i = 0; i < results.length; i++) {
+    var r   = results[i];
+    var sc  = r.score;
+    var rc  = sc >= 85 ? "#4CAF50" : sc >= 60 ? "#FF9800" : "#ef5350";
+    var ico = r.passed ? "&#10003;" : "&#10007;";
+    var ibg = r.passed ? "#e8f5e9" : "#ffebee";
+    var ifc = r.passed ? "#2e7d32" : "#c62828";
+    var extra = r.mastery_reps > 0
+      ? '<span style="font-size:11px;color:#e65100;margin-left:6px">+' +
+        r.mastery_reps + ' mastery</span>' : "";
+    rowsHtml +=
+      '<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;' +
+      'border-radius:10px;background:#f8f7ff;border-left:5px solid ' + rc +
+      ';margin-bottom:8px;">' +
+      '<span style="font-size:18px;font-weight:800;color:' + ifc +
+      ';background:' + ibg + ';width:28px;height:28px;border-radius:50%;' +
+      'display:grid;place-items:center;">' + ico + '</span>' +
+      '<span style="flex:1;font-size:14px;color:#1a1033;">' +
+        r.sentence + extra + '</span>' +
+      '<span style="font-size:12px;font-weight:700;color:#fff;background:' +
+      rc + ';padding:3px 10px;border-radius:20px;">' + sc + '%</span></div>';
+  }
+
+  done.innerHTML =
+    '<div style="text-align:center;padding:8px 0 20px">' +
+      '<div style="font-size:48px;margin-bottom:10px">&#127881;</div>' +
+      '<h2 style="font-size:26px;font-weight:800;color:#4318D1;margin-bottom:6px">' +
+        'Session Complete!</h2>' +
+      '<p style="font-size:14px;color:#888;margin-bottom:20px">' +
+        studentName + ' — here is how you did:</p>' +
+      '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:24px;flex-wrap:wrap">' +
+        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
+          '<div style="font-size:30px;font-weight:800;color:#4318D1">' +
+            passed + '/' + total + '</div>' +
+          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Passed</div>' +
+        '</div>' +
+        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
+          '<div style="font-size:30px;font-weight:800;color:' + color + '">' +
+            avgScore + '%</div>' +
+          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Avg Score</div>' +
+        '</div>' +
+        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
+          '<div style="font-size:30px;font-weight:800;color:#4318D1">' +
+            Math.round((passed / Math.max(total,1)) * 100) + '%</div>' +
+          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Accuracy</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="text-align:left;margin-bottom:20px">' + rowsHtml + '</div>' +
+      '<button class="btn btn-p" style="width:100%;padding:13px;font-size:16px" ' +
+        'onclick="resetSession()">&#128260; Start Again</button>' +
+    '</div>';
 }
 
 function resetSession() {
-  fetch("/reset", { method: "POST" })
-    .then(function() {
-      document.getElementById("main-card").style.display = "block";
-      document.getElementById("done-card").style.display = "none";
-      loadQuestion();
-    });
+  fetch("/reset", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({student: studentName})
+  }).then(function() {
+    document.getElementById("main-card").style.display = "block";
+    document.getElementById("done-card").style.display = "none";
+    loadQuestion();
+  });
 }
-
-loadQuestion();
 </script>
 </body>
 </html>

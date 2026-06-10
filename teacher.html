@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EZRA — Teacher Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --p:#4318D1; --p2:#6b4df0; --p3:#ede7ff;
+  --green:#2e7d32; --green2:#4CAF50; --green3:#e8f5e9;
+  --red:#c62828; --red2:#ef5350; --red3:#ffebee;
+  --orange:#e65100; --orange2:#FF9800; --orange3:#fff3e0;
+  --bg:#F4F2FF; --card:#fff; --text:#1a1033; --muted:#888;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Sora',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+header {
+  background:linear-gradient(110deg,#1a0a6b,#4318D1 60%,#7c3aed);
+  color:#fff; padding:0 32px; height:64px;
+  display:flex; align-items:center; gap:16px;
+  box-shadow:0 2px 20px rgba(67,24,209,.35);
+}
+.logo { width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,.15); border:2px solid rgba(255,255,255,.4);
+  display:grid; place-items:center; font-size:17px; font-weight:800; }
+header h1 { font-size:20px; font-weight:800; }
+header p  { font-size:11px; opacity:.7; margin-top:1px; }
+.refresh-info {
+  margin-left:auto; font-size:12px; opacity:.8;
+  display:flex; align-items:center; gap:8px;
+}
+.dot-live {
+  width:8px; height:8px; border-radius:50%; background:#4CAF50;
+  animation:blink 1.4s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.container { max-width:1100px; margin:0 auto; padding:28px 20px; }
+
+/* ── Summary bar ─────────────────────────────────────────── */
+.summary-row {
+  display:flex; gap:14px; flex-wrap:wrap; margin-bottom:28px;
+}
+.stat-card {
+  background:#fff; border-radius:16px; padding:18px 22px;
+  box-shadow:0 4px 18px rgba(67,24,209,.09);
+  border:1px solid rgba(67,24,209,.07); flex:1; min-width:130px;
+  text-align:center;
+}
+.stat-card .val { font-size:32px; font-weight:800; color:var(--p); }
+.stat-card .lbl { font-size:11px; color:var(--muted); font-weight:700;
+  text-transform:uppercase; letter-spacing:.5px; margin-top:4px; }
+
+/* ── Student cards ───────────────────────────────────────── */
+.students-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+  gap:18px;
+}
+.student-card {
+  background:#fff; border-radius:18px; padding:22px 24px;
+  box-shadow:0 4px 18px rgba(67,24,209,.09);
+  border:1px solid rgba(67,24,209,.07);
+}
+.sc-header {
+  display:flex; align-items:center; gap:10px; margin-bottom:14px;
+}
+.avatar {
+  width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg,var(--p),var(--p2));
+  color:#fff; display:grid; place-items:center;
+  font-size:16px; font-weight:800; flex-shrink:0;
+}
+.sc-name { font-size:17px; font-weight:700; }
+.sc-status {
+  margin-left:auto; font-size:11px; font-weight:700;
+  padding:3px 10px; border-radius:20px;
+}
+.st-active   { background:#e8f5e9; color:#2e7d32; }
+.st-mastery  { background:var(--orange3); color:var(--orange); }
+.st-done     { background:var(--p3); color:var(--p); }
+.st-waiting  { background:#f5f5f5; color:#888; }
+
+.prog-wrap { margin-bottom:12px; }
+.prog-label { font-size:12px; color:var(--muted); font-weight:600;
+  display:flex; justify-content:space-between; margin-bottom:5px; }
+.prog-track { background:#e8e4ff; border-radius:20px; height:8px; }
+.prog-fill  { height:8px; border-radius:20px;
+  background:linear-gradient(90deg,var(--p),var(--p2)); transition:width .5s; }
+
+.score-badge {
+  display:inline-block; font-size:14px; font-weight:700;
+  padding:4px 12px; border-radius:20px; color:#fff; margin-bottom:14px;
+}
+
+/* Sentence breakdown table */
+.sent-table { width:100%; border-collapse:collapse; font-size:13px; }
+.sent-table th {
+  text-align:left; color:var(--muted); font-weight:700;
+  font-size:11px; text-transform:uppercase; padding:0 0 6px;
+  border-bottom:2px solid #f0eeff;
+}
+.sent-table td {
+  padding:6px 0; border-bottom:1px solid #f5f3ff; vertical-align:middle;
+}
+.sent-table tr:last-child td { border-bottom:none; }
+.badge-score {
+  font-size:12px; font-weight:700; padding:2px 8px;
+  border-radius:12px; color:#fff; white-space:nowrap;
+}
+.no-students {
+  text-align:center; padding:60px 20px; color:var(--muted);
+  font-size:15px;
+}
+.no-students div { font-size:48px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">E</div>
+  <div><h1>EZRA — Teacher Dashboard</h1><p>Live student monitoring</p></div>
+  <div class="refresh-info">
+    <div class="dot-live"></div>
+    <span id="refresh-label">Refreshing in 30s</span>
+    <button onclick="refresh()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);
+      color:#fff;padding:4px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;">
+      ↻ Now
+    </button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="summary-row" id="summary-row">
+    <div class="stat-card"><div class="val" id="s-students">0</div><div class="lbl">Students</div></div>
+    <div class="stat-card"><div class="val" id="s-active">0</div><div class="lbl">Active</div></div>
+    <div class="stat-card"><div class="val" id="s-done">0</div><div class="lbl">Completed</div></div>
+    <div class="stat-card"><div class="val" id="s-avg">—</div><div class="lbl">Avg Score</div></div>
+  </div>
+  <div class="students-grid" id="students-grid">
+    <div class="no-students">
+      <div>👩‍🏫</div>
+      Waiting for students to join…<br>
+      Share the app URL and ask students to enter their name.
+    </div>
+  </div>
+</div>
+
+<script>
+var countdown = 30;
+var timer;
+
+function scoreColor(s) {
+  return s >= 85 ? "#4CAF50" : s >= 60 ? "#FF9800" : "#ef5350";
+}
+
+function initial(name) {
+  return (name || "?").charAt(0).toUpperCase();
+}
+
+function refresh() {
+  clearInterval(timer);
+  fetch("/teacher/data")
+    .then(function(r) { return r.json(); })
+    .then(function(data) { render(data); })
+    .catch(function() {})
+    .finally(function() { startCountdown(); });
+}
+
+function startCountdown() {
+  countdown = 30;
+  document.getElementById("refresh-label").textContent = "Refreshing in 30s";
+  timer = setInterval(function() {
+    countdown--;
+    document.getElementById("refresh-label").textContent =
+      countdown > 0 ? "Refreshing in " + countdown + "s" : "Refreshing…";
+    if (countdown <= 0) {
+      clearInterval(timer);
+      refresh();
+    }
+  }, 1000);
+}
+
+function render(data) {
+  var grid = document.getElementById("students-grid");
+
+  if (!data || data.length === 0) {
+    grid.innerHTML = '<div class="no-students"><div>👩‍🏫</div>' +
+      'Waiting for students to join…<br>' +
+      'Share the app URL and ask students to enter their name.</div>';
+    document.getElementById("s-students").textContent = "0";
+    document.getElementById("s-active").textContent   = "0";
+    document.getElementById("s-done").textContent     = "0";
+    document.getElementById("s-avg").textContent      = "—";
+    return;
+  }
+
+  // Summary stats
+  var active  = data.filter(function(d) { return !d.completed; }).length;
+  var done    = data.filter(function(d) { return d.completed;  }).length;
+  var allAvg  = data.filter(function(d) { return d.avg_score > 0; });
+  var avgAll  = allAvg.length
+    ? Math.round(allAvg.reduce(function(a,d){ return a + d.avg_score; }, 0) / allAvg.length) : 0;
+  document.getElementById("s-students").textContent = data.length;
+  document.getElementById("s-active").textContent   = active;
+  document.getElementById("s-done").textContent     = done;
+  document.getElementById("s-avg").textContent      = avgAll ? avgAll + "%" : "—";
+
+  // Student cards
+  grid.innerHTML = "";
+  data.forEach(function(d) {
+    var pct     = d.total ? Math.round((d.current / d.total) * 100) : 0;
+    var statusTxt, statusCls;
+    if (d.completed) {
+      statusTxt = "✓ Done"; statusCls = "st-done";
+    } else if (d.mastery_needed > 0) {
+      statusTxt = "⭐ Mastery ×" + d.mastery_needed; statusCls = "st-mastery";
+    } else if (d.current > 0 || d.failed_current > 0) {
+      statusTxt = "● Active"; statusCls = "st-active";
+    } else {
+      statusTxt = "Waiting"; statusCls = "st-waiting";
+    }
+
+    var scoreHtml = "";
+    if (d.avg_score > 0) {
+      scoreHtml = '<span class="score-badge" style="background:' +
+        scoreColor(d.avg_score) + '">' + d.avg_score + '% avg</span>';
+    }
+
+    // Sentences table
+    var sentRows = "";
+    if (d.sentences && d.sentences.length) {
+      sentRows = '<table class="sent-table">' +
+        '<tr><th style="width:50%">Sentence</th><th>Score</th><th>Tries</th><th>Mastery</th></tr>';
+      d.sentences.forEach(function(r) {
+        sentRows +=
+          '<tr>' +
+          '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
+            r.sentence + '">' + r.sentence + '</td>' +
+          '<td><span class="badge-score" style="background:' + scoreColor(r.score) + '">' +
+            r.score + '%</span></td>' +
+          '<td style="color:' + (r.attempts > 1 ? "#e65100" : "#2e7d32") + ';font-weight:700">' +
+            r.attempts + '</td>' +
+          '<td style="color:' + (r.mastery_reps > 0 ? "#e65100" : "#aaa") + ';font-weight:600">' +
+            (r.mastery_reps > 0 ? "+" + r.mastery_reps : "—") + '</td>' +
+          '</tr>';
+      });
+      sentRows += '</table>';
+    } else {
+      sentRows = '<div style="font-size:13px;color:var(--muted);padding:4px 0">No sentences completed yet.</div>';
+    }
+
+    // Currently working on
+    var currentInfo = "";
+    if (!d.completed && d.current < d.total) {
+      currentInfo =
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">' +
+        'Working on sentence ' + (d.current + 1) +
+        (d.failed_current > 0
+          ? ' — <span style="color:#e65100;font-weight:700">' +
+            d.failed_current + ' attempt' + (d.failed_current > 1 ? 's' : '') + ' so far</span>'
+          : '') +
+        '</div>';
+    }
+
+    var card = document.createElement("div");
+    card.className = "student-card";
+    card.innerHTML =
+      '<div class="sc-header">' +
+        '<div class="avatar">' + initial(d.name) + '</div>' +
+        '<div>' +
+          '<div class="sc-name">' + d.name + '</div>' +
+          '<div style="font-size:12px;color:var(--muted)">' +
+            d.current + ' / ' + d.total + ' sentences</div>' +
+        '</div>' +
+        '<span class="sc-status ' + statusCls + '">' + statusTxt + '</span>' +
+      '</div>' +
+      '<div class="prog-wrap">' +
+        '<div class="prog-label">' +
+          '<span>Progress</span><span>' + pct + '%</span>' +
+        '</div>' +
+        '<div class="prog-track">' +
+          '<div class="prog-fill" style="width:' + pct + '%"></div>' +
+        '</div>' +
+      '</div>' +
+      scoreHtml +
+      currentInfo +
+      sentRows;
+
+    grid.appendChild(card);
+  });
+}
+
+refresh();
+</script>
+</body>
+</html>
