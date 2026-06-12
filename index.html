@@ -250,28 +250,25 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 
 <script>
 var studentName  = "";
+var studentId    = "";   // unique per login: name + timestamp
 var currentQ     = null;
 var waiting      = false;
-var masteryTotal = 0;   // how many mastery reps were required at the start
+var masteryTotal = 0;
 
 /* ── Name entry ─────────────────────────────────────────── */
 function startSession() {
   var name = document.getElementById("name-input").value.trim();
   if (!name) { document.getElementById("name-input").focus(); return; }
   studentName = name;
+  studentId   = name + "_" + Date.now();   // fresh ID every login
   document.getElementById("name-overlay").style.display = "none";
   document.getElementById("student-tag").textContent = "👤 " + name;
-  // Always start fresh — reset any existing session for this name
-  fetch("/reset", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({student: studentName})
-  }).then(function() { loadQuestion(); });
+  loadQuestion();
 }
 
 /* ── Session ─────────────────────────────────────────────── */
 function qs(extra) {
-  return "/question?student=" + encodeURIComponent(studentName) + (extra || "");
+  return "/question?student=" + encodeURIComponent(studentId) + (extra || "");
 }
 
 function loadQuestion() {
@@ -368,7 +365,7 @@ function startRecognition() {
     fetch("/answer", {
       method:  "POST",
       headers: {"Content-Type": "application/json"},
-      body:    JSON.stringify({student: studentName, answer: text})
+      body:    JSON.stringify({student: studentId, answer: text})
     })
     .then(function(r) { return r.json(); })
     .then(function(result) { showResult(result); })
@@ -563,10 +560,11 @@ function showDoneScreen(q) {
 }
 
 function resetSession() {
+  studentId = studentName + "_" + Date.now();   // new ID for new round
   fetch("/reset", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({student: studentName})
+    body: JSON.stringify({student: studentId})
   }).then(function() {
     document.getElementById("main-card").style.display = "block";
     document.getElementById("done-card").style.display = "none";

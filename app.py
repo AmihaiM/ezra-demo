@@ -74,9 +74,11 @@ def new_session(name):
     }
 
 
-def get_session(sid):
+def get_session(sid, display_name=None):
     if sid not in students:
-        students[sid] = new_session(sid)
+        # Use display_name (without timestamp suffix) if provided
+        name = display_name or sid.rsplit("_", 1)[0] if "_" in sid else sid
+        students[sid] = new_session(name)
     return students[sid]
 
 
