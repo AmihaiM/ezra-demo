@@ -155,14 +155,17 @@ def post_answer():
     if s["mastery_needed"] > 0:
         if passed:
             s["mastery_needed"] -= 1
+            s["mastery_score"]   = score   # keep the latest passing score
             if s["mastery_needed"] == 0:
                 record_and_advance(
                     attempts     = s["failed_attempts"] + 1,
                     mastery_reps = s["failed_attempts"],
-                    final_score  = s["mastery_score"],
+                    final_score  = score,
                 )
                 return jsonify({**base, "mastery_mode": False,
                                 "mastery_needed": 0, "advance": True})
+        else:
+            s["mastery_needed"] = s["failed_attempts"]   # reset mastery on failure
         return jsonify({**base, "mastery_mode": True,
                         "mastery_needed": s["mastery_needed"], "advance": False})
 
