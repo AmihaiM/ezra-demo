@@ -253,6 +253,7 @@ var studentName  = "";
 var studentId    = "";   // unique per login: name + timestamp
 var currentQ     = null;
 var waiting      = false;
+var processing   = false;  // blocks duplicate mic submissions
 var masteryTotal = 0;
 
 /* ── Name entry ─────────────────────────────────────────── */
@@ -339,21 +340,24 @@ function hideMasteryBanner() {
 
 /* ── Speech recognition ──────────────────────────────────── */
 function startRecognition() {
-  if (waiting) return;
+  if (waiting || processing) return;
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { alert("Speech Recognition not supported. Please use Chrome or Edge."); return; }
 
+  processing = true;
   var rec      = new SR();
   var micBtn   = document.getElementById("mic-btn");
   var micLabel = document.getElementById("mic-label");
 
   rec.lang = "en-US";
   rec.interimResults = false;
+  rec.maxAlternatives = 1;
 
   micBtn.classList.add("listening");
   micLabel.textContent = "Listening...";
 
   rec.onresult = function(event) {
+    rec.abort();   // stop immediately — prevent duplicate results
     var text = event.results[0][0].transcript;
     micBtn.classList.remove("listening");
     micLabel.textContent = "Processing...";
@@ -368,19 +372,22 @@ function startRecognition() {
       body:    JSON.stringify({student: studentId, answer: text})
     })
     .then(function(r) { return r.json(); })
-    .then(function(result) { showResult(result); })
-    .catch(function() { micLabel.textContent = "Error — try again"; });
+    .then(function(result) { processing = false; showResult(result); })
+    .catch(function() { processing = false; micLabel.textContent = "Error — try again"; });
   };
 
   rec.onerror = function() {
+    processing = false;
     micBtn.classList.remove("listening");
     micLabel.textContent = "Error — try again";
   };
 
   rec.onend = function() {
     micBtn.classList.remove("listening");
-    if (micLabel.textContent === "Listening...")
+    if (micLabel.textContent === "Listening...") {
+      processing = false;
       micLabel.textContent = "Tap to speak";
+    }
   };
 
   rec.start();
@@ -478,6 +485,7 @@ function showResult(result) {
 
 /* ── Reset UI ────────────────────────────────────────────── */
 function resetUI() {
+  processing = false;
   var sb = document.getElementById("spoken-box");
   sb.classList.remove("visible"); sb.textContent = "";
   document.getElementById("word-feedback").classList.remove("visible");
