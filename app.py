@@ -34,8 +34,8 @@ def _ensure_header(sheet):
     try:
         if not sheet.get_all_values():
             sheet.append_row([
-                "Timestamp", "Student", "Sentence",
-                "Score", "Passed", "Attempts", "Mastery Reps"
+                "Time", "Student", "Sentence",
+                "Score", "Passed", "Attempts", "Mastery Repetitions"
             ])
     except Exception:
         pass
