@@ -15,7 +15,6 @@ students = {}
 
 # ── Google Sheets logging ────────────────────────────────────
 def _get_sheet():
-    """Return the first sheet of the configured Google Spreadsheet, or None."""
     creds_json = os.environ.get("GOOGLE_CREDENTIALS")
     sheet_id   = os.environ.get("GOOGLE_SHEET_ID")
     if not creds_json or not sheet_id:
@@ -30,7 +29,6 @@ def _get_sheet():
 
 
 def _ensure_header(sheet):
-    """Add header row if the sheet is empty."""
     try:
         if not sheet.get_all_values():
             sheet.append_row([
@@ -42,7 +40,6 @@ def _ensure_header(sheet):
 
 
 def log_result(student_name, sentence, score, passed, attempts, mastery_reps):
-    """Write one completed sentence to Google Sheets (silently fails if not configured)."""
     try:
         sheet = _get_sheet()
         if sheet is None:
@@ -50,34 +47,44 @@ def log_result(student_name, sentence, score, passed, attempts, mastery_reps):
         _ensure_header(sheet)
         sheet.append_row([
             datetime.now().strftime("%Y-%m-%d %H:%M"),
-            student_name,
-            sentence,
-            score,
+            student_name, sentence, score,
             "Yes" if passed else "No",
-            attempts,
-            mastery_reps,
+            attempts, mastery_reps,
         ])
     except Exception:
-        pass   # Never let logging break the app
+        pass
 
 
 # ── Session helpers ──────────────────────────────────────────
+def mastery_target_for(failures):
+    """
+    Consecutive correct productions needed, per Bloom / motor-language research:
+      0 failures → 0  (advance immediately)
+      1 failure  → 3
+      2 failures → 4
+      3+         → 5
+    """
+    if failures == 0:
+        return 0
+    return min(failures + 2, 5)
+
+
 def new_session(name):
     return {
-        "name":            name,
-        "current":         0,
-        "failed_attempts": 0,
-        "mastery_needed":  0,
-        "mastery_score":   0,
-        "sentences":       [],
-        "completed":       False,
+        "name":               name,
+        "current":            0,
+        "failed_attempts":    0,   # failures on current sentence
+        "mastery_target":     0,   # consecutive correct needed (0 = not in mastery)
+        "mastery_consecutive": 0,  # current streak
+        "mastery_score":      0,   # latest passing score
+        "sentences":          [],
+        "completed":          False,
     }
 
 
-def get_session(sid, display_name=None):
+def get_session(sid):
     if sid not in students:
-        # Use display_name (without timestamp suffix) if provided
-        name = display_name or sid.rsplit("_", 1)[0] if "_" in sid else sid
+        name = sid.rsplit("_", 1)[0] if "_" in sid else sid
         students[sid] = new_session(name)
     return students[sid]
 
@@ -104,6 +111,14 @@ def word_level(spoken, correct):
     return result
 
 
+def mastery_payload(s):
+    return {
+        "mastery_target":      s["mastery_target"],
+        "mastery_consecutive": s["mastery_consecutive"],
+        "mastery_remaining":   s["mastery_target"] - s["mastery_consecutive"],
+    }
+
+
 # ── Routes ───────────────────────────────────────────────────
 @app.route("/question")
 def get_question():
@@ -120,9 +135,12 @@ def get_question():
                         "passed": passed, "total": total, "avg_score": avg})
 
     q = QUESTIONS[s["current"]].copy()
-    q.update(index=s["current"], total=len(QUESTIONS),
-             mastery_needed=s["mastery_needed"],
-             failed_attempts=s["failed_attempts"])
+    q.update(
+        index              = s["current"],
+        total              = len(QUESTIONS),
+        failed_attempts    = s["failed_attempts"],
+        **mastery_payload(s)
+    )
     return jsonify(q)
 
 
@@ -141,56 +159,89 @@ def post_answer():
     base = dict(correct=correct, spoken=spoken, words=words,
                 threshold=PASS_THRESHOLD, score=score, passed=passed)
 
-    def record_and_advance(attempts, mastery_reps, final_score):
-        """Save sentence, log to Sheets, advance counter."""
-        rec = {"sentence": correct, "score": final_score,
-               "passed": True, "attempts": attempts, "mastery_reps": mastery_reps}
-        s["sentences"].append(rec)
-        log_result(s["name"], correct, final_score, True, attempts, mastery_reps)
-        s["current"]        += 1
-        s["failed_attempts"] = 0
-        s["mastery_score"]   = 0
+    def record_and_advance():
+        s["sentences"].append({
+            "sentence":    correct,
+            "score":       s["mastery_score"] or score,
+            "passed":      True,
+            "attempts":    s["failed_attempts"] + s["mastery_target"],
+            "mastery_reps": s["mastery_target"],
+        })
+        log_result(
+            s["name"], correct,
+            s["mastery_score"] or score, True,
+            s["failed_attempts"] + s["mastery_target"],
+            s["mastery_target"],
+        )
+        s["current"]            += 1
+        s["failed_attempts"]     = 0
+        s["mastery_target"]      = 0
+        s["mastery_consecutive"] = 0
+        s["mastery_score"]       = 0
 
-    # ── Mastery mode ─────────────────────────────────────────
-    if s["mastery_needed"] > 0:
+    # ── In mastery mode ───────────────────────────────────────
+    if s["mastery_target"] > 0:
         if passed:
-            s["mastery_needed"] -= 1
-            s["mastery_score"]   = score   # keep the latest passing score
-            if s["mastery_needed"] == 0:
-                record_and_advance(
-                    attempts     = s["failed_attempts"] + 1,
-                    mastery_reps = s["failed_attempts"],
-                    final_score  = score,
-                )
+            s["mastery_consecutive"] += 1
+            s["mastery_score"]        = score
+
+            if s["mastery_consecutive"] >= s["mastery_target"]:
+                record_and_advance()
                 return jsonify({**base, "mastery_mode": False,
-                                "mastery_needed": 0, "advance": True})
+                                "mastery_mode_done": True,
+                                "advance": True, **mastery_payload(s)})
+
+            return jsonify({**base, "mastery_mode": True,
+                            "streak_broken": False, "advance": False,
+                            **mastery_payload(s)})
         else:
-            s["mastery_needed"] = s["failed_attempts"]   # reset mastery on failure
-        return jsonify({**base, "mastery_mode": True,
-                        "mastery_needed": s["mastery_needed"], "advance": False})
+            # Streak broken — reset consecutive
+            s["mastery_consecutive"] = 0
+            return jsonify({**base, "mastery_mode": True,
+                            "streak_broken": True, "advance": False,
+                            **mastery_payload(s)})
 
     # ── Normal mode ───────────────────────────────────────────
     if passed:
-        if s["failed_attempts"] == 0:
-            record_and_advance(attempts=1, mastery_reps=0, final_score=score)
+        target = mastery_target_for(s["failed_attempts"])
+        if target == 0:
+            # Perfect first attempt — advance directly
+            s["sentences"].append({
+                "sentence": correct, "score": score,
+                "passed": True, "attempts": 1, "mastery_reps": 0,
+            })
+            log_result(s["name"], correct, score, True, 1, 0)
+            s["current"]        += 1
+            s["failed_attempts"] = 0
             return jsonify({**base, "mastery_mode": False,
-                            "mastery_needed": 0, "advance": True})
+                            "advance": True, **mastery_payload(s)})
         else:
-            s["mastery_needed"] = s["failed_attempts"]
-            s["mastery_score"]  = score
-            return jsonify({**base, "mastery_mode": True, "first_pass": True,
-                            "mastery_needed": s["mastery_needed"], "advance": False})
+            # Enter mastery: first pass counts as consecutive #1
+            s["mastery_target"]      = target
+            s["mastery_consecutive"] = 1
+            s["mastery_score"]       = score
+
+            if s["mastery_consecutive"] >= target:   # edge case: target=1
+                record_and_advance()
+                return jsonify({**base, "mastery_mode": False,
+                                "advance": True, **mastery_payload(s)})
+
+            return jsonify({**base, "mastery_mode": True,
+                            "first_pass": True, "streak_broken": False,
+                            "advance": False, **mastery_payload(s)})
     else:
         s["failed_attempts"] += 1
-        return jsonify({**base, "mastery_mode": False, "mastery_needed": 0,
-                        "advance": False, "failed_attempts": s["failed_attempts"]})
+        return jsonify({**base, "mastery_mode": False, "advance": False,
+                        "failed_attempts": s["failed_attempts"],
+                        **mastery_payload(s)})
 
 
 @app.route("/reset", methods=["POST"])
 def reset():
     data = request.get_json(force=True)
     sid  = data.get("student", "guest")
-    students[sid] = new_session(sid)
+    name = sid.rsplit("_", 1)[0] if "_" in sid else sid
+    students[sid] = new_session(name)
     return jsonify({"ok": True})
 
 
@@ -210,15 +261,16 @@ def teacher_data():
         avg    = int(sum(r["score"] for r in sents) / len(sents)) if sents else 0
         passed = sum(1 for r in sents if r["passed"])
         out.append({
-            "name":           s["name"],
-            "current":        s["current"],
-            "total":          len(QUESTIONS),
-            "completed":      s["completed"],
-            "avg_score":      avg,
-            "passed":         passed,
-            "sentences":      sents,
-            "mastery_needed": s["mastery_needed"],
-            "failed_current": s["failed_attempts"],
+            "name":               s["name"],
+            "current":            s["current"],
+            "total":              len(QUESTIONS),
+            "completed":          s["completed"],
+            "avg_score":          avg,
+            "passed":             passed,
+            "sentences":          sents,
+            "mastery_target":     s["mastery_target"],
+            "mastery_consecutive": s["mastery_consecutive"],
+            "failed_current":     s["failed_attempts"],
         })
     return jsonify(out)
 

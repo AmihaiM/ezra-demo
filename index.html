@@ -140,21 +140,33 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 
 /* ── Mastery banner ───────────────────────────────────────── */
 #mastery-banner {
-  background:var(--orange3); border:2px solid var(--orange2);
-  border-radius:14px; padding:16px 18px; margin-top:14px; display:none;
+  border:2px solid var(--orange2); border-radius:14px;
+  padding:16px 18px; margin-top:14px; display:none;
+  transition:background .3s;
 }
-#mastery-banner.visible { display:block; }
+#mastery-banner.visible   { display:block; background:var(--orange3); }
+#mastery-banner.streak-ok { background:#fff8e1; border-color:#ffc107; }
+#mastery-banner.broken    { background:var(--red3); border-color:var(--red2); }
 #mastery-banner h3 {
   font-size:15px; font-weight:700; color:var(--orange); margin-bottom:4px;
 }
+#mastery-banner.broken h3 { color:var(--red); }
 #mastery-banner p { font-size:13px; color:#7a4000; margin-bottom:12px; }
+#mastery-banner.broken p  { color:#7a0000; }
 .mastery-dots { display:flex; gap:8px; flex-wrap:wrap; }
 .m-dot {
   width:24px; height:24px; border-radius:50%;
   border:2.5px solid var(--orange2); background:#ffe0b2;
-  transition:background .3s;
+  transition:all .25s;
 }
-.m-dot.done { background:var(--orange2); }
+.m-dot.done  { background:var(--orange2); transform:scale(1.1); }
+.m-dot.reset { background:#ffcdd2; border-color:var(--red2);
+               animation:shake-dot .3s; }
+@keyframes shake-dot {
+  0%,100%{ transform:translateX(0); }
+  25%    { transform:translateX(-4px); }
+  75%    { transform:translateX(4px); }
+}
 
 /* ── Done screen ──────────────────────────────────────────── */
 .done-screen { text-align:center; padding:10px 0; }
@@ -286,11 +298,9 @@ function loadQuestion() {
       document.getElementById("prog-fill").style.width =
         Math.round((q.index / q.total) * 100) + "%";
 
-      if (q.mastery_needed > 0) {
-        // Resuming mid-mastery (e.g. page reload) — restore mastery UI
-        masteryTotal = q.mastery_needed;
-        showMasteryBanner(q.mastery_needed, masteryTotal);
-        // Auto-reveal English in mastery mode
+      if (q.mastery_target > 0) {
+        // Resuming mid-mastery (e.g. page reload)
+        showMasteryBanner(q.mastery_consecutive || 0, q.mastery_target, false);
         document.getElementById("english-ref").style.opacity = "1";
       } else {
         setTimeout(playSentence, 400);
@@ -316,25 +326,46 @@ function revealEnglish() {
 }
 
 /* ── Mastery banner ──────────────────────────────────────── */
-function showMasteryBanner(remaining, total) {
+function showMasteryBanner(consecutive, target, broken) {
   var banner = document.getElementById("mastery-banner");
   var msg    = document.getElementById("mastery-msg");
   var dots   = document.getElementById("mastery-dots");
+
+  banner.classList.remove("broken", "streak-ok");
   banner.classList.add("visible");
-  msg.textContent = remaining === 1
-    ? "One more correct repetition to go!"
-    : "Say it correctly " + remaining + " more time" + (remaining > 1 ? "s" : "") + " to reinforce.";
+
+  if (broken) {
+    banner.classList.add("broken");
+    document.getElementById("mastery-banner").querySelector("h3").textContent =
+      "⭐ Mastery Mode — Streak Broken!";
+    msg.textContent = "Start your streak over — say it correctly " +
+      target + " times in a row.";
+  } else {
+    document.getElementById("mastery-banner").querySelector("h3").textContent =
+      "⭐ Mastery Mode — Benjamin Bloom";
+    var remaining = target - consecutive;
+    msg.textContent = consecutive > 0
+      ? "🔥 Streak: " + consecutive + "/" + target + " — " +
+        (remaining === 1 ? "one more!" : remaining + " more in a row.")
+      : "Say it correctly " + target + " times in a row.";
+    if (consecutive > 0) banner.classList.add("streak-ok");
+  }
+
+  // Render dots
   dots.innerHTML = "";
-  for (var i = 0; i < total; i++) {
+  for (var i = 0; i < target; i++) {
     var d = document.createElement("div");
-    d.className = "m-dot" + (i < (total - remaining) ? " done" : "");
+    d.className = "m-dot" +
+      (broken ? " reset" : (i < consecutive ? " done" : ""));
     dots.appendChild(d);
   }
+
   document.getElementById("mic-btn").classList.add("mastery-active");
 }
 
 function hideMasteryBanner() {
-  document.getElementById("mastery-banner").classList.remove("visible");
+  var banner = document.getElementById("mastery-banner");
+  banner.classList.remove("visible", "broken", "streak-ok");
   document.getElementById("mic-btn").classList.remove("mastery-active");
 }
 
@@ -428,31 +459,31 @@ function showResult(result) {
   var title  = document.getElementById("result-title");
   var sub    = document.getElementById("result-sub");
 
+  var consecutive = result.mastery_consecutive || 0;
+  var target      = result.mastery_target      || 0;
+  var broken      = result.streak_broken       || false;
+
   if (result.mastery_mode) {
+    document.getElementById("english-ref").style.opacity = "1";
+
     if (result.first_pass) {
-      // Just entered mastery — celebrate the pass, show mastery requirement
-      masteryTotal = result.mastery_needed;
       banner.className  = "result-banner visible pass";
       icon.textContent  = "✓";
-      title.textContent = "Great job! Now reinforce it.";
-      sub.textContent   = "You passed after " + masteryTotal + " mistake" +
-                          (masteryTotal > 1 ? "s" : "") +
-                          " — say it correctly " + masteryTotal +
-                          " more time" + (masteryTotal > 1 ? "s" : "") + ".";
-      document.getElementById("english-ref").style.opacity = "1";
+      title.textContent = "Well done! Now build the habit.";
+      sub.textContent   = "You need " + target + " correct in a row.";
+    } else if (broken) {
+      banner.className  = "result-banner visible fail";
+      icon.textContent  = "✗";
+      title.textContent = "Streak broken — start over!";
+      sub.textContent   = "Score: " + score + "% — need " + result.threshold + "% to count.";
     } else if (passed) {
       banner.className  = "result-banner visible pass";
       icon.textContent  = "✓";
-      title.textContent = result.mastery_needed === 0 ? "Mastered! ★" : "Keep going!";
-      sub.textContent   = result.mastery_needed + " more rep" +
-                          (result.mastery_needed !== 1 ? "s" : "") + " to go.";
-    } else {
-      banner.className  = "result-banner visible fail";
-      icon.textContent  = "✗";
-      title.textContent = "Not quite — try again.";
-      sub.textContent   = "Score: " + score + "% — need " + result.threshold + "% to count.";
+      title.textContent = consecutive + "/" + target + " in a row!";
+      sub.textContent   = (target - consecutive) + " more correct in a row to go.";
     }
-    showMasteryBanner(result.mastery_needed, masteryTotal);
+
+    showMasteryBanner(consecutive, target, broken);
 
     if (result.advance) {
       hideMasteryBanner();
@@ -460,7 +491,7 @@ function showResult(result) {
       setTimeout(function() { waiting = false; loadQuestion(); }, 1800);
     } else {
       document.getElementById("mic-label").textContent =
-        passed ? "Keep going — tap to speak" : "Tap to try again";
+        broken ? "Tap to start your streak" : "Keep going — tap to speak";
     }
 
   } else {
