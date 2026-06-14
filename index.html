@@ -376,25 +376,59 @@ function startRecognition() {
   if (!SR) { alert("Speech Recognition not supported. Please use Chrome or Edge."); return; }
 
   processing = true;
-  var rec      = new SR();
-  var micBtn   = document.getElementById("mic-btn");
-  var micLabel = document.getElementById("mic-label");
+  var rec       = new SR();
+  var micBtn    = document.getElementById("mic-btn");
+  var micLabel  = document.getElementById("mic-label");
+  var spokenBox = document.getElementById("spoken-box");
 
-  rec.lang = "en-US";
-  rec.interimResults = false;
+  rec.lang            = "en-US";
+  rec.continuous      = true;    // keep listening through short pauses
+  rec.interimResults  = true;    // show live transcript
   rec.maxAlternatives = 1;
+
+  var finalText    = "";
+  var submitted    = false;
+  var silenceTimer = null;
 
   micBtn.classList.add("listening");
   micLabel.textContent = "Listening...";
 
   rec.onresult = function(event) {
-    var text = event.results[0][0].transcript;
-    micBtn.classList.remove("listening");
-    micLabel.textContent = "Processing...";
-
-    var spokenBox = document.getElementById("spoken-box");
-    spokenBox.textContent = "You said: " + text;
+    var interim = "";
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        finalText += event.results[i][0].transcript + " ";
+      } else {
+        interim += event.results[i][0].transcript;
+      }
+    }
+    // Show live transcript
+    spokenBox.textContent = (finalText + interim).trim();
     spokenBox.classList.add("visible");
+
+    // Stop 1.5 s after last speech activity
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(function() {
+      if (!submitted) rec.stop();
+    }, 1500);
+  };
+
+  rec.onend = function() {
+    micBtn.classList.remove("listening");
+    if (submitted) return;
+    submitted = true;
+    if (silenceTimer) clearTimeout(silenceTimer);
+
+    var text = finalText.trim();
+    if (!text) {
+      processing = false;
+      micLabel.textContent = "Tap to speak";
+      spokenBox.classList.remove("visible");
+      return;
+    }
+
+    micLabel.textContent  = "Processing...";
+    spokenBox.textContent = "You said: " + text;
 
     fetch("/answer", {
       method:  "POST",
@@ -408,16 +442,9 @@ function startRecognition() {
 
   rec.onerror = function() {
     processing = false;
+    submitted  = true;
     micBtn.classList.remove("listening");
     micLabel.textContent = "Error — try again";
-  };
-
-  rec.onend = function() {
-    micBtn.classList.remove("listening");
-    if (micLabel.textContent === "Listening...") {
-      processing = false;
-      micLabel.textContent = "Tap to speak";
-    }
   };
 
   rec.start();
