@@ -383,7 +383,7 @@ function startRecognition() {
 
   rec.lang            = "en-US";
   rec.continuous      = true;    // keep listening through short pauses
-  rec.interimResults  = false;   // final results only — no duplicate accumulation
+  rec.interimResults  = true;    // show live transcript
   rec.maxAlternatives = 1;
 
   var finalText    = "";
@@ -394,13 +394,16 @@ function startRecognition() {
   micLabel.textContent = "Listening...";
 
   rec.onresult = function(event) {
-    // Only final results arrive (interimResults=false), safe to append
+    var interim = "";
     for (var i = event.resultIndex; i < event.results.length; i++) {
       if (event.results[i].isFinal) {
         finalText += event.results[i][0].transcript + " ";
+      } else {
+        interim += event.results[i][0].transcript;
       }
     }
-    spokenBox.textContent = finalText.trim();
+    // Show live transcript
+    spokenBox.textContent = (finalText + interim).trim();
     spokenBox.classList.add("visible");
 
     // Stop 1.5 s after last speech activity
