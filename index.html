@@ -388,7 +388,6 @@ function startRecognition() {
   micLabel.textContent = "Listening...";
 
   rec.onresult = function(event) {
-    rec.abort();   // stop immediately — prevent duplicate results
     var text = event.results[0][0].transcript;
     micBtn.classList.remove("listening");
     micLabel.textContent = "Processing...";
