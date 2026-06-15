@@ -383,7 +383,7 @@ function startRecognition() {
 
   rec.lang            = "en-US";
   rec.continuous      = true;    // keep listening through short pauses
-  rec.interimResults  = true;    // show live transcript
+  rec.interimResults = false;    // show live transcript
   rec.maxAlternatives = 1;
 
   var finalText    = "";
@@ -393,7 +393,10 @@ function startRecognition() {
   // Reset on every new recording session
   finalText = "";
   spokenBox.textContent = "";
-
+  finalText = "";
+  document.getElementById("spoken").innerText = "";
+  (finalText + " " + interim).trim();
+  
   micBtn.classList.add("listening");
   micLabel.textContent = "Listening...";
 
@@ -453,7 +456,7 @@ function startRecognition() {
     micBtn.classList.remove("listening");
     micLabel.textContent = "Error — try again";
   };
-
+  finalText = "";
   rec.start();
 }
 
