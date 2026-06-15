@@ -390,20 +390,27 @@ function startRecognition() {
   var submitted    = false;
   var silenceTimer = null;
 
+  // Reset on every new recording session
+  finalText = "";
+  spokenBox.textContent = "";
+
   micBtn.classList.add("listening");
   micLabel.textContent = "Listening...";
 
   rec.onresult = function(event) {
     var interim = "";
+    var currentFinal = "";
     for (var i = event.resultIndex; i < event.results.length; i++) {
       if (event.results[i].isFinal) {
-        finalText += event.results[i][0].transcript + " ";
+        currentFinal += event.results[i][0].transcript + " ";
       } else {
         interim += event.results[i][0].transcript;
       }
     }
-    // Show live transcript
-    spokenBox.textContent = (finalText + interim).trim();
+    if (currentFinal.trim() !== "") {
+      finalText = currentFinal.trim();
+    }
+    spokenBox.textContent = (finalText + " " + interim).trim();
     spokenBox.classList.add("visible");
 
     // Stop 1.5 s after last speech activity
