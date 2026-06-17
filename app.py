@@ -13,6 +13,27 @@ with open(os.path.join(BASE_DIR, "questions.json"), encoding="utf-8") as f:
 PASS_THRESHOLD = 85
 students = {}
 
+# ── Google Sheets colour palette ─────────────────────────────
+_STUDENT_PALETTE = [
+    {"red": 0.85, "green": 0.92, "blue": 1.00},  # sky blue
+    {"red": 0.88, "green": 1.00, "blue": 0.88},  # mint green
+    {"red": 1.00, "green": 0.95, "blue": 0.82},  # peach
+    {"red": 0.94, "green": 0.88, "blue": 1.00},  # lavender
+    {"red": 1.00, "green": 0.88, "blue": 0.94},  # rose
+    {"red": 0.88, "green": 1.00, "blue": 0.97},  # teal
+    {"red": 1.00, "green": 1.00, "blue": 0.82},  # yellow
+    {"red": 0.95, "green": 0.88, "blue": 0.82},  # sand
+]
+_student_color_map = {}
+_color_idx = 0
+
+def _student_color(name):
+    global _color_idx
+    if name not in _student_color_map:
+        _student_color_map[name] = _STUDENT_PALETTE[_color_idx % len(_STUDENT_PALETTE)]
+        _color_idx += 1
+    return _student_color_map[name]
+
 
 # ── Google Sheets logging ────────────────────────────────────
 def _get_sheet():
@@ -31,11 +52,21 @@ def _get_sheet():
 
 def _ensure_header(sheet):
     try:
-        if not sheet.get_all_values():
+        vals = sheet.get_all_values()
+        if not vals:
             sheet.append_row([
                 "Time", "Student", "Sentence",
                 "Score", "Passed", "Attempts", "Mastery Repetitions"
             ])
+            # Style the header row
+            sheet.format("A1:G1", {
+                "backgroundColor": {"red": 0.13, "green": 0.08, "blue": 0.42},
+                "textFormat": {
+                    "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                    "bold": True, "fontSize": 11
+                },
+                "horizontalAlignment": "CENTER"
+            })
     except Exception:
         pass
 
@@ -52,6 +83,36 @@ def log_result(student_name, sentence, score, passed, attempts, mastery_reps):
             "Yes" if passed else "No",
             attempts, mastery_reps,
         ])
+        # Find the row we just wrote
+        row_num = len(sheet.get_all_values())
+
+        # Row background = student colour
+        bg = _student_color(student_name)
+        sheet.format(f"A{row_num}:G{row_num}", {
+            "backgroundColor": bg,
+            "borders": {
+                "bottom": {"style": "SOLID", "color": {"red":0,"green":0,"blue":0}},
+                "top":    {"style": "SOLID", "color": {"red":0,"green":0,"blue":0}},
+                "left":   {"style": "SOLID", "color": {"red":0,"green":0,"blue":0}},
+                "right":  {"style": "SOLID", "color": {"red":0,"green":0,"blue":0}},
+            }
+        })
+
+        # Score cell colour + bold
+        if score >= 85:
+            score_bg = {"red": 0.72, "green": 0.96, "blue": 0.72}  # green
+            score_fg = {"red": 0.05, "green": 0.30, "blue": 0.05}
+        elif score >= 60:
+            score_bg = {"red": 1.00, "green": 0.85, "blue": 0.55}  # orange
+            score_fg = {"red": 0.40, "green": 0.20, "blue": 0.00}
+        else:
+            score_bg = {"red": 1.00, "green": 0.70, "blue": 0.70}  # red
+            score_fg = {"red": 0.50, "green": 0.00, "blue": 0.00}
+
+        sheet.format(f"D{row_num}", {
+            "backgroundColor": score_bg,
+            "textFormat": {"foregroundColor": score_fg, "bold": True}
+        })
     except Exception:
         pass
 

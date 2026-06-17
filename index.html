@@ -180,6 +180,7 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 </style>
 </head>
 <body>
+<canvas id="confetti-canvas" style="position:fixed;top:0;left:0;pointer-events:none;z-index:1000;display:none"></canvas>
 
 <!-- ── Name entry overlay ── -->
 <div id="name-overlay">
@@ -487,6 +488,74 @@ function startRecognition() {
 }
 
 /* ── Show result ─────────────────────────────────────────── */
+/* ── Confetti ────────────────────────────────────────────── */
+function launchConfetti() {
+  var canvas = document.getElementById("confetti-canvas");
+  var ctx    = canvas.getContext("2d");
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = "block";
+  var colors = ["#4318D1","#7c3aed","#4CAF50","#FF9800","#FFC107","#2196F3","#ef5350"];
+  var pieces = [];
+  for (var i = 0; i < 140; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * -canvas.height * 0.5,
+      w: Math.random() * 11 + 5,
+      h: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * 360,
+      vx: (Math.random() - 0.5) * 3,
+      vy: Math.random() * 4 + 2,
+      vr: (Math.random() - 0.5) * 9
+    });
+  }
+  var ticks = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var alive = false;
+    for (var j = 0; j < pieces.length; j++) {
+      var p = pieces[j];
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      if (p.y < canvas.height) alive = true;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    }
+    ticks++;
+    if (alive && ticks < 220) { requestAnimationFrame(draw); }
+    else { canvas.style.display = "none"; ctx.clearRect(0,0,canvas.width,canvas.height); }
+  }
+  draw();
+}
+
+/* ── Encouragement messages ──────────────────────────────── */
+var MSG_PASS = [
+  "מצוין! 🎉", "כל הכבוד! ⭐", "מדהים! 🚀", "Perfect! 🏆",
+  "Excellent! ✨", "יפה מאוד! 💫", "Bravo! 🌟", "נהדר! 🎯"
+];
+var MSG_FAIL = [
+  "כמעט! נסה שוב 💪", "אתה יכול! 🌟", "So close! Keep going! 💙",
+  "Don't give up! 🔥", "עוד קצת! 😊", "Almost there! ⚡",
+  "Try once more! 💎", "הכוח בך! 🦁"
+];
+var MSG_MASTERY_DONE = [
+  "הרגל נבנה! 🧠", "WOW — Master level! 🎓", "Bloom would be proud! 🏆",
+  "מאסטר! מושלם! 🌈"
+];
+var MSG_STREAK = [
+  "Keep the streak! 🔥", "🔥 " , "Unstoppable! ⚡", "ממשיך לנצח! 💪"
+];
+var MSG_BROKEN = [
+  "נסה שוב מההתחלה 💙", "Breathe — you got this! 😊",
+  "Start fresh — you're close! 🌟", "חזרה לדרך! 💪"
+];
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+/* ── Show result ─────────────────────────────────────────── */
 function showResult(result) {
   var score  = result.score;
   var passed = result.passed;
@@ -530,43 +599,54 @@ function showResult(result) {
 
     if (result.first_pass) {
       banner.className  = "result-banner visible pass";
-      icon.textContent  = "✓";
-      title.textContent = "Well done! Now build the habit.";
-      sub.textContent   = "You need " + target + " correct in a row.";
+      icon.textContent  = "🌟";
+      title.textContent = pick(MSG_PASS) + " עכשיו לבנות הרגל!";
+      sub.textContent   = "אמור נכון " + target + " פעמים ברצף.";
     } else if (broken) {
       banner.className  = "result-banner visible fail";
-      icon.textContent  = "✗";
-      title.textContent = "Streak broken — start over!";
-      sub.textContent   = "Score: " + score + "% — need " + result.threshold + "% to count.";
+      icon.textContent  = "💙";
+      title.textContent = pick(MSG_BROKEN);
+      sub.textContent   = "ציון: " + score + "% — צריך " + result.threshold + "% להמשיך.";
     } else if (passed) {
       banner.className  = "result-banner visible pass";
-      icon.textContent  = "✓";
-      title.textContent = consecutive + "/" + target + " in a row!";
-      sub.textContent   = (target - consecutive) + " more correct in a row to go.";
+      icon.textContent  = "🔥";
+      title.textContent = consecutive + "/" + target + " ברצף! " + pick(MSG_STREAK);
+      sub.textContent   = "עוד " + (target - consecutive) + " פעמים ברצף.";
+      if (consecutive >= 2) launchConfetti();
     }
 
     showMasteryBanner(consecutive, target, broken);
 
     if (result.advance) {
+      launchConfetti();
       hideMasteryBanner();
+      banner.className  = "result-banner visible pass";
+      icon.textContent  = "🏆";
+      title.textContent = pick(MSG_MASTERY_DONE);
+      sub.textContent   = "עוברים למשפט הבא...";
       waiting = true;
-      setTimeout(function() { waiting = false; loadQuestion(); }, 1800);
+      setTimeout(function() { waiting = false; loadQuestion(); }, 2200);
     } else {
       document.getElementById("mic-label").textContent =
-        broken ? "Tap to start your streak" : "Keep going — tap to speak";
+        broken ? "טפח לדיבור — התחל מחדש" : "המשך — טפח לדיבור";
     }
 
   } else {
     // Normal mode
-    banner.className  = "result-banner visible " + (passed ? "pass" : "fail");
-    icon.textContent  = passed ? "✓" : "✗";
-    title.textContent = passed ? "Great job!"
-                      : score >= 60 ? "Close! Try again." : "Try again.";
-    sub.textContent   = passed
-      ? "Score: " + score + "% — moving to next sentence…"
-      : "Score: " + score + "% — you need " + result.threshold + "% to pass.";
+    if (passed) {
+      launchConfetti();
+      banner.className  = "result-banner visible pass";
+      icon.textContent  = "🎉";
+      title.textContent = pick(MSG_PASS);
+      sub.textContent   = "ציון: " + score + "% — עוברים הלאה...";
+    } else {
+      banner.className  = "result-banner visible fail";
+      icon.textContent  = "💪";
+      title.textContent = pick(MSG_FAIL);
+      sub.textContent   = "ציון: " + score + "% — צריך " + result.threshold + "% לעבור.";
+    }
     document.getElementById("mic-label").textContent =
-      passed ? "Moving on…" : "Tap to try again";
+      passed ? "Moving on…" : "טפח לנסות שוב";
 
     if (result.advance) {
       waiting = true;
