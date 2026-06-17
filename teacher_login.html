@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EZRA — כניסת מורה</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family:'Sora',sans-serif;
+  background:linear-gradient(135deg,#1a0a6b 0%,#4318D1 60%,#7c3aed 100%);
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:24px;
+}
+.card {
+  background:#fff; border-radius:24px; padding:48px 40px;
+  max-width:420px; width:100%; text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+}
+.logo {
+  width:72px; height:72px; border-radius:50%;
+  background:linear-gradient(135deg,#4318D1,#7c3aed);
+  display:grid; place-items:center; margin:0 auto 20px;
+  font-size:30px; font-weight:800; color:#fff;
+}
+h2 { font-size:26px; font-weight:800; color:#1a1033; margin-bottom:6px; }
+.subtitle { font-size:13px; color:#888; margin-bottom:32px; }
+
+.field { margin-bottom:16px; text-align:right; }
+.field label { font-size:12px; font-weight:700; color:#4318D1;
+  text-transform:uppercase; letter-spacing:.5px; display:block; margin-bottom:6px; }
+.field input {
+  width:100%; padding:13px 16px; border:2px solid #e0d9ff;
+  border-radius:12px; font-family:'Sora',sans-serif; font-size:15px;
+  color:#1a1033; outline:none; transition:border-color .2s; direction:ltr;
+}
+.field input:focus { border-color:#4318D1; }
+
+.error {
+  background:#ffebee; border:2px solid #ef5350; border-radius:10px;
+  padding:10px 14px; font-size:13px; color:#c62828;
+  margin-bottom:16px; display:{{ERROR_DISPLAY}};
+}
+
+.btn {
+  width:100%; padding:14px; border:none; border-radius:12px;
+  background:linear-gradient(90deg,#4318D1,#7c3aed);
+  color:#fff; font-family:'Sora',sans-serif; font-size:16px;
+  font-weight:700; cursor:pointer; margin-top:8px; transition:.2s;
+}
+.btn:hover { opacity:.9; transform:translateY(-1px); }
+
+.badge {
+  display:inline-block; background:#ede7ff; color:#4318D1;
+  font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px;
+  margin-bottom:28px; text-transform:uppercase; letter-spacing:.5px;
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">E</div>
+  <div class="badge">Teacher Access</div>
+  <h2>EZRA</h2>
+  <p class="subtitle">כניסת מורה — לוח בקרה</p>
+
+  <div class="error" style="display:{{ERROR_DISPLAY}}">{{ERROR}}</div>
+
+  <form method="POST" action="/teacher-login">
+    <div class="field">
+      <label>אימייל</label>
+      <input type="email" name="email" placeholder="teacher@school.com" required autofocus>
+    </div>
+    <div class="field">
+      <label>סיסמה</label>
+      <input type="password" name="password" placeholder="••••••••" required>
+    </div>
+    <button class="btn" type="submit">כניסה לדשבורד →</button>
+  </form>
+</div>
+<script>
+// Hide error div if empty
+var err = document.querySelector('.error');
+if (err && err.textContent.trim() === '') err.style.display = 'none';
+</script>
+</body>
+</html>

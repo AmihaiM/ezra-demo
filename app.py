@@ -1,10 +1,11 @@
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, jsonify, request, make_response, session, redirect
 from difflib import SequenceMatcher
 import json, re, os
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-fallback-key")
 
 with open(os.path.join(BASE_DIR, "questions.json"), encoding="utf-8") as f:
     QUESTIONS = json.load(f)
@@ -245,8 +246,54 @@ def reset():
     return jsonify({"ok": True})
 
 
+@app.route("/")
+def home():
+    r = make_response(open(os.path.join(BASE_DIR, "index.html"), encoding="utf-8").read())
+    r.headers["Content-Type"] = "text/html; charset=utf-8"
+    return r
+
+
+# ── Auth: student password check ─────────────────────────────
+@app.route("/verify-student", methods=["POST"])
+def verify_student():
+    data     = request.get_json(force=True)
+    password = data.get("password", "")
+    expected = os.environ.get("STUDENT_PASSWORD", "")
+    if not expected or password == expected:
+        return jsonify({"ok": True})
+    return jsonify({"ok": False}), 401
+
+
+# ── Auth: teacher login / logout ──────────────────────────────
+@app.route("/teacher-login", methods=["GET", "POST"])
+def teacher_login():
+    error = ""
+    if request.method == "POST":
+        email    = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        expected = os.environ.get("TEACHER_PASSWORD", "")
+        if expected and password == expected and "@" in email:
+            session["teacher"] = email
+            return redirect("/teacher")
+        error = "אימייל או סיסמה שגויים"
+
+    path = os.path.join(BASE_DIR, "teacher_login.html")
+    html = open(path, encoding="utf-8").read().replace("{{ERROR}}", error)
+    r = make_response(html)
+    r.headers["Content-Type"] = "text/html; charset=utf-8"
+    return r
+
+
+@app.route("/teacher-logout")
+def teacher_logout():
+    session.pop("teacher", None)
+    return redirect("/teacher-login")
+
+
 @app.route("/teacher")
 def teacher():
+    if not session.get("teacher"):
+        return redirect("/teacher-login")
     path = os.path.join(BASE_DIR, "teacher.html")
     r = make_response(open(path, encoding="utf-8").read())
     r.headers["Content-Type"] = "text/html; charset=utf-8"
@@ -255,6 +302,8 @@ def teacher():
 
 @app.route("/teacher/data")
 def teacher_data():
+    if not session.get("teacher"):
+        return jsonify({"error": "unauthorized"}), 401
     out = []
     for sid, s in students.items():
         sents  = s["sentences"]
@@ -273,13 +322,6 @@ def teacher_data():
             "failed_current":     s["failed_attempts"],
         })
     return jsonify(out)
-
-
-@app.route("/")
-def home():
-    r = make_response(open(os.path.join(BASE_DIR, "index.html"), encoding="utf-8").read())
-    r.headers["Content-Type"] = "text/html; charset=utf-8"
-    return r
 
 
 if __name__ == "__main__":
