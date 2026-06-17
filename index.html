@@ -189,7 +189,14 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
     <p>English Speech Practice — powered by Bloom's Mastery</p>
     <input class="name-input" id="name-input" type="text"
            placeholder="Enter your name..." maxlength="40"
+           onkeydown="if(event.key==='Enter') document.getElementById('pass-input').focus()">
+    <input class="name-input" id="pass-input" type="password"
+           placeholder="Class password..." maxlength="40"
            onkeydown="if(event.key==='Enter') startSession()">
+    <div id="login-error" style="display:none;background:#ffebee;border:2px solid #ef5350;
+         border-radius:10px;padding:10px 14px;font-size:13px;color:#c62828;margin-bottom:12px">
+      Wrong password — try again.
+    </div>
     <button class="btn btn-p" style="width:100%;padding:13px;font-size:16px"
             onclick="startSession()">Start Practice →</button>
   </div>
@@ -271,12 +278,34 @@ var masteryTotal = 0;
 /* ── Name entry ─────────────────────────────────────────── */
 function startSession() {
   var name = document.getElementById("name-input").value.trim();
+  var pass = document.getElementById("pass-input").value;
   if (!name) { document.getElementById("name-input").focus(); return; }
-  studentName = name;
-  studentId   = name + "_" + Date.now();   // fresh ID every login
-  document.getElementById("name-overlay").style.display = "none";
-  document.getElementById("student-tag").textContent = "👤 " + name;
-  loadQuestion();
+  if (!pass)  { document.getElementById("pass-input").focus(); return; }
+
+  var errBox = document.getElementById("login-error");
+  errBox.style.display = "none";
+
+  fetch("/verify-student", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({password: pass})
+  })
+  .then(function(r) {
+    if (r.ok) {
+      studentName = name;
+      studentId   = name + "_" + Date.now();
+      document.getElementById("name-overlay").style.display = "none";
+      document.getElementById("student-tag").textContent = "👤 " + name;
+      loadQuestion();
+    } else {
+      errBox.style.display = "block";
+      document.getElementById("pass-input").value = "";
+      document.getElementById("pass-input").focus();
+    }
+  })
+  .catch(function() {
+    errBox.style.display = "block";
+  });
 }
 
 /* ── Session ─────────────────────────────────────────────── */
@@ -393,10 +422,7 @@ function startRecognition() {
   // Reset on every new recording session
   finalText = "";
   spokenBox.textContent = "";
-  finalText = "";
-  document.getElementById("spoken").innerText = "";
-  (finalText + " " + interim).trim();
-  
+
   micBtn.classList.add("listening");
   micLabel.textContent = "Listening...";
 
