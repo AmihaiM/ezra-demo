@@ -186,20 +186,35 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 <div id="name-overlay">
   <div class="name-card">
     <div class="logo-big">E</div>
-    <h2>Welcome to EZRA</h2>
-    <p>English Speech Practice — powered by Bloom's Mastery</p>
+    <h2>ברוך הבא ל-EZRA</h2>
+    <p>תרגול אנגלית דבורה — שיטת Bloom's Mastery</p>
     <input class="name-input" id="name-input" type="text"
-           placeholder="Enter your name..." maxlength="40"
+           placeholder="השם שלך..." maxlength="40"
            onkeydown="if(event.key==='Enter') document.getElementById('pass-input').focus()">
     <input class="name-input" id="pass-input" type="password"
-           placeholder="Class password..." maxlength="40"
+           placeholder="סיסמת כיתה..." maxlength="40"
            onkeydown="if(event.key==='Enter') startSession()">
+
+    <!-- Voice selector -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;justify-content:center">
+      <button id="voice-f" onclick="setVoiceGender('female')" type="button"
+        style="flex:1;padding:10px;border-radius:10px;border:2px solid #4318D1;
+               background:#4318D1;color:white;font-size:14px;font-weight:700;cursor:pointer">
+        👩 קול נשי
+      </button>
+      <button id="voice-m" onclick="setVoiceGender('male')" type="button"
+        style="flex:1;padding:10px;border-radius:10px;border:2px solid #e0d9ff;
+               background:white;color:#4318D1;font-size:14px;font-weight:700;cursor:pointer">
+        👨 קול גברי
+      </button>
+    </div>
+
     <div id="login-error" style="display:none;background:#ffebee;border:2px solid #ef5350;
          border-radius:10px;padding:10px 14px;font-size:13px;color:#c62828;margin-bottom:12px">
-      Wrong password — try again.
+      סיסמה שגויה — נסה שוב.
     </div>
     <button class="btn btn-p" style="width:100%;padding:13px;font-size:16px"
-            onclick="startSession()">Start Practice →</button>
+            onclick="startSession()">התחל תרגול ←</button>
   </div>
 </div>
 
@@ -229,7 +244,7 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
   <button class="mic-btn" id="mic-btn" onclick="startRecognition()">
     <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3.03 2.93 5.37 5.91 5.82V20c0 .55.45 1 1 1s1-.45 1-1v-2.04c2.98-.45 5.42-2.79 5.91-5.82.1-.6-.39-1.14-1-1.14z"/></svg>
   </button>
-  <div class="mic-label" id="mic-label">Tap to speak</div>
+  <div class="mic-label" id="mic-label">הקש לדיבור</div>
 
   <div class="spoken-box" id="spoken-box"></div>
 
@@ -248,6 +263,19 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
       <span><div class="dot" style="background:#ffcdd2"></div> wrong / missed</span>
       <span><div class="dot" style="background:#ffe0b2"></div> missing word</span>
     </div>
+  </div>
+
+  <!-- Cloze mode banner -->
+  <div id="cloze-banner" style="display:none;background:#e0f2fe;border:2px solid #0284c7;
+       border-radius:14px;padding:16px 18px;margin-top:14px">
+    <h3 style="font-size:15px;font-weight:700;color:#0369a1;margin-bottom:4px">
+      🧩 השלם את המשפט
+    </h3>
+    <p id="cloze-msg" style="font-size:13px;color:#075985;margin-bottom:8px">
+      אמור את המשפט עם המילה החסרה
+    </p>
+    <div id="cloze-sentence" style="font-size:17px;font-weight:600;
+         color:#0c4a6e;letter-spacing:.3px"></div>
   </div>
 
   <!-- Mastery reinforcement banner -->
@@ -269,14 +297,46 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
 <div class="card" id="done-card" style="display:none"></div>
 
 <script>
+// ── State ─────────────────────────────────────────────────
 var studentName  = "";
-var studentId    = "";   // unique per login: name + timestamp
+var studentId    = "";
 var currentQ     = null;
 var waiting      = false;
-var processing   = false;  // blocks duplicate mic submissions
-var masteryTotal = 0;
+var processing   = false;
+var voiceGender  = "female";
+var practiceResults = [];  // saved from practice phase for exam
 
-/* ── Name entry ─────────────────────────────────────────── */
+// ── Voice selector ────────────────────────────────────────
+function setVoiceGender(gender) {
+  voiceGender = gender;
+  var fBtn = document.getElementById("voice-f");
+  var mBtn = document.getElementById("voice-m");
+  var activeStyle   = "flex:1;padding:10px;border-radius:10px;border:2px solid #4318D1;background:#4318D1;color:white;font-size:14px;font-weight:700;cursor:pointer";
+  var inactiveStyle = "flex:1;padding:10px;border-radius:10px;border:2px solid #e0d9ff;background:white;color:#4318D1;font-size:14px;font-weight:700;cursor:pointer";
+  fBtn.style.cssText = gender === "female" ? activeStyle : inactiveStyle;
+  mBtn.style.cssText = gender === "male"   ? activeStyle : inactiveStyle;
+}
+
+function getVoice() {
+  var voices = speechSynthesis.getVoices().filter(function(v) {
+    return v.lang.startsWith("en");
+  });
+  if (!voices.length) return null;
+  if (voiceGender === "male") {
+    return voices.find(function(v) {
+      return /david|daniel|alex|fred|ralph|junior|male/i.test(v.name);
+    }) || voices[Math.min(1, voices.length - 1)];
+  }
+  return voices.find(function(v) {
+    return /zira|samantha|karen|victoria|allison|ava|female/i.test(v.name);
+  }) || voices[0];
+}
+// Pre-load voices
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = function() { speechSynthesis.getVoices(); };
+}
+
+// ── Login ─────────────────────────────────────────────────
 function startSession() {
   var name = document.getElementById("name-input").value.trim();
   var pass = document.getElementById("pass-input").value;
@@ -290,8 +350,7 @@ function startSession() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({password: pass})
-  })
-  .then(function(r) {
+  }).then(function(r) {
     if (r.ok) {
       studentName = name;
       studentId   = name + "_" + Date.now();
@@ -303,33 +362,29 @@ function startSession() {
       document.getElementById("pass-input").value = "";
       document.getElementById("pass-input").focus();
     }
-  })
-  .catch(function() {
-    errBox.style.display = "block";
-  });
+  }).catch(function() { errBox.style.display = "block"; });
 }
 
-/* ── Session ─────────────────────────────────────────────── */
-function qs(extra) {
-  return "/question?student=" + encodeURIComponent(studentId) + (extra || "");
-}
-
+// ── Question loading ──────────────────────────────────────
 function loadQuestion() {
   resetUI();
-  fetch(qs())
+  fetch("/question?student=" + encodeURIComponent(studentId))
     .then(function(r) { return r.json(); })
     .then(function(q) {
-      if (q.done) { showDoneScreen(q); return; }
+      if (q.done) {
+        practiceResults = q.results || [];
+        startExamMode(practiceResults);
+        return;
+      }
       currentQ = q;
       document.getElementById("hebrew").textContent      = q.he;
       document.getElementById("english-ref").textContent = q.en;
       document.getElementById("prog-label").textContent  =
-        "Sentence " + (q.index + 1) + " of " + q.total;
+        "משפט " + (q.index + 1) + " מתוך " + q.total;
       document.getElementById("prog-fill").style.width =
         Math.round((q.index / q.total) * 100) + "%";
 
       if (q.mastery_target > 0) {
-        // Resuming mid-mastery (e.g. page reload)
         showMasteryBanner(q.mastery_consecutive || 0, q.mastery_target, false);
         document.getElementById("english-ref").style.opacity = "1";
       } else {
@@ -337,16 +392,18 @@ function loadQuestion() {
       }
     })
     .catch(function(err) {
-      document.getElementById("hebrew").textContent = "Error: " + err.message;
+      document.getElementById("hebrew").textContent = "שגיאה: " + err.message;
     });
 }
 
-/* ── Play / reveal ───────────────────────────────────────── */
+// ── Play / reveal ─────────────────────────────────────────
 function playSentence() {
   if (!currentQ) return;
   speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(currentQ.en);
   u.lang = "en-US"; u.rate = 0.9;
+  var v = getVoice();
+  if (v) u.voice = v;
   speechSynthesis.speak(u);
 }
 
@@ -355,7 +412,35 @@ function revealEnglish() {
   el.style.opacity = el.style.opacity === "1" ? "0" : "1";
 }
 
-/* ── Mastery banner ──────────────────────────────────────── */
+// ── Cloze banner ──────────────────────────────────────────
+function showClozeBanner(clozeWord, attemptsLeft) {
+  if (!currentQ) return;
+  var banner  = document.getElementById("cloze-banner");
+  var msg     = document.getElementById("cloze-msg");
+  var sentEl  = document.getElementById("cloze-sentence");
+
+  // Build blanked sentence
+  var words = currentQ.en.split(" ");
+  var blanked = words.map(function(w) {
+    return w.toLowerCase().replace(/[^a-z]/g, "") === clozeWord ? "______" : w;
+  }).join(" ");
+
+  sentEl.textContent  = blanked;
+  msg.textContent     = attemptsLeft < 3
+    ? "נסיון " + (4 - attemptsLeft) + "/3 — אמור את המשפט המלא כולל המילה החסרה"
+    : "אמור את המשפט המלא כולל המילה החסרה";
+  banner.style.display = "block";
+  document.getElementById("english-ref").style.opacity = "1";
+  document.getElementById("mic-btn").style.background  = "#0284c7";
+  document.getElementById("mic-label").textContent = "הקש לדיבור";
+}
+
+function hideCloze() {
+  document.getElementById("cloze-banner").style.display = "none";
+  document.getElementById("mic-btn").style.background = "";
+}
+
+// ── Mastery banner ────────────────────────────────────────
 function showMasteryBanner(consecutive, target, broken) {
   var banner = document.getElementById("mastery-banner");
   var msg    = document.getElementById("mastery-msg");
@@ -366,30 +451,24 @@ function showMasteryBanner(consecutive, target, broken) {
 
   if (broken) {
     banner.classList.add("broken");
-    document.getElementById("mastery-banner").querySelector("h3").textContent =
-      "⭐ Mastery Mode — Streak Broken!";
-    msg.textContent = "Start your streak over — say it correctly " +
-      target + " times in a row.";
+    banner.querySelector("h3").textContent = "⭐ מצב שליטה — הרצף נשבר!";
+    msg.textContent = "התחל מחדש — אמור נכון " + target + " פעמים ברצף.";
   } else {
-    document.getElementById("mastery-banner").querySelector("h3").textContent =
-      "⭐ Mastery Mode — Benjamin Bloom";
+    banner.querySelector("h3").textContent = "⭐ מצב שליטה — Benjamin Bloom";
     var remaining = target - consecutive;
     msg.textContent = consecutive > 0
-      ? "🔥 Streak: " + consecutive + "/" + target + " — " +
-        (remaining === 1 ? "one more!" : remaining + " more in a row.")
-      : "Say it correctly " + target + " times in a row.";
+      ? "🔥 רצף: " + consecutive + "/" + target + " — " +
+        (remaining === 1 ? "עוד אחת!" : "עוד " + remaining + " ברצף.")
+      : "אמור נכון " + target + " פעמים ברצף.";
     if (consecutive > 0) banner.classList.add("streak-ok");
   }
 
-  // Render dots
   dots.innerHTML = "";
   for (var i = 0; i < target; i++) {
     var d = document.createElement("div");
-    d.className = "m-dot" +
-      (broken ? " reset" : (i < consecutive ? " done" : ""));
+    d.className = "m-dot" + (broken ? " reset" : (i < consecutive ? " done" : ""));
     dots.appendChild(d);
   }
-
   document.getElementById("mic-btn").classList.add("mastery-active");
 }
 
@@ -399,11 +478,14 @@ function hideMasteryBanner() {
   document.getElementById("mic-btn").classList.remove("mastery-active");
 }
 
-/* ── Speech recognition ──────────────────────────────────── */
+// ── Speech recognition ────────────────────────────────────
 function startRecognition() {
   if (waiting || processing) return;
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert("Speech Recognition not supported. Please use Chrome or Edge."); return; }
+  if (!SR) {
+    alert("זיהוי קול אינו נתמך — יש להשתמש ב-Chrome או Edge.");
+    return;
+  }
 
   processing = true;
   var rec       = new SR();
@@ -411,43 +493,27 @@ function startRecognition() {
   var micLabel  = document.getElementById("mic-label");
   var spokenBox = document.getElementById("spoken-box");
 
-  rec.lang            = "en-US";
-  rec.continuous      = true;    // keep listening through short pauses
-  rec.interimResults = false;    // show live transcript
+  rec.lang = "en-US";
+  rec.continuous = true;
+  rec.interimResults = false;
   rec.maxAlternatives = 1;
 
-  var finalText    = "";
-  var submitted    = false;
-  var silenceTimer = null;
-
-  // Reset on every new recording session
-  finalText = "";
+  var finalText = "", submitted = false, silenceTimer = null;
   spokenBox.textContent = "";
-
   micBtn.classList.add("listening");
-  micLabel.textContent = "Listening...";
+  micLabel.textContent = "מקשיב...";
 
   rec.onresult = function(event) {
-    var interim = "";
-    var currentFinal = "";
+    var interim = "", currentFinal = "";
     for (var i = event.resultIndex; i < event.results.length; i++) {
-      if (event.results[i].isFinal) {
-        currentFinal += event.results[i][0].transcript + " ";
-      } else {
-        interim += event.results[i][0].transcript;
-      }
+      if (event.results[i].isFinal) currentFinal += event.results[i][0].transcript + " ";
+      else interim += event.results[i][0].transcript;
     }
-    if (currentFinal.trim() !== "") {
-      finalText = currentFinal.trim();
-    }
+    if (currentFinal.trim()) finalText = currentFinal.trim();
     spokenBox.textContent = (finalText + " " + interim).trim();
     spokenBox.classList.add("visible");
-
-    // Stop 1.5 s after last speech activity
     if (silenceTimer) clearTimeout(silenceTimer);
-    silenceTimer = setTimeout(function() {
-      if (!submitted) rec.stop();
-    }, 1500);
+    silenceTimer = setTimeout(function() { if (!submitted) rec.stop(); }, 1500);
   };
 
   rec.onend = function() {
@@ -455,147 +521,125 @@ function startRecognition() {
     if (submitted) return;
     submitted = true;
     if (silenceTimer) clearTimeout(silenceTimer);
-
     var text = finalText.trim();
     if (!text) {
       processing = false;
-      micLabel.textContent = "Tap to speak";
+      micLabel.textContent = "הקש לדיבור";
       spokenBox.classList.remove("visible");
       return;
     }
-
-    micLabel.textContent  = "Processing...";
-    spokenBox.textContent = "You said: " + text;
-
+    micLabel.textContent  = "מעבד...";
+    spokenBox.textContent = "אמרת: " + text;
     fetch("/answer", {
-      method:  "POST",
+      method: "POST",
       headers: {"Content-Type": "application/json"},
-      body:    JSON.stringify({student: studentId, answer: text})
+      body: JSON.stringify({student: studentId, answer: text})
     })
     .then(function(r) { return r.json(); })
     .then(function(result) { processing = false; showResult(result); })
-    .catch(function() { processing = false; micLabel.textContent = "Error — try again"; });
+    .catch(function() { processing = false; micLabel.textContent = "שגיאה — נסה שוב"; });
   };
 
   rec.onerror = function() {
-    processing = false;
-    submitted  = true;
+    processing = false; submitted = true;
     micBtn.classList.remove("listening");
-    micLabel.textContent = "Error — try again";
+    micLabel.textContent = "שגיאה — נסה שוב";
   };
-  finalText = "";
   rec.start();
 }
 
-/* ── Show result ─────────────────────────────────────────── */
-/* ── Confetti ────────────────────────────────────────────── */
-function launchConfetti() {
-  var canvas = document.getElementById("confetti-canvas");
-  var ctx    = canvas.getContext("2d");
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-  canvas.style.display = "block";
-  var colors = ["#4318D1","#7c3aed","#4CAF50","#FF9800","#FFC107","#2196F3","#ef5350"];
-  var pieces = [];
-  for (var i = 0; i < 140; i++) {
-    pieces.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * -canvas.height * 0.5,
-      w: Math.random() * 11 + 5,
-      h: Math.random() * 6 + 3,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      rot: Math.random() * 360,
-      vx: (Math.random() - 0.5) * 3,
-      vy: Math.random() * 4 + 2,
-      vr: (Math.random() - 0.5) * 9
-    });
-  }
-  var ticks = 0;
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var alive = false;
-    for (var j = 0; j < pieces.length; j++) {
-      var p = pieces[j];
-      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
-      if (p.y < canvas.height) alive = true;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot * Math.PI / 180);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
-      ctx.restore();
-    }
-    ticks++;
-    if (alive && ticks < 220) { requestAnimationFrame(draw); }
-    else { canvas.style.display = "none"; ctx.clearRect(0,0,canvas.width,canvas.height); }
-  }
-  draw();
-}
-
-/* ── Encouragement messages ──────────────────────────────── */
-var MSG_PASS = [
-  "מצוין! 🎉", "כל הכבוד! ⭐", "מדהים! 🚀", "Perfect! 🏆",
-  "Excellent! ✨", "יפה מאוד! 💫", "Bravo! 🌟", "נהדר! 🎯"
-];
-var MSG_FAIL = [
-  "כמעט! נסה שוב 💪", "אתה יכול! 🌟", "So close! Keep going! 💙",
-  "Don't give up! 🔥", "עוד קצת! 😊", "Almost there! ⚡",
-  "Try once more! 💎", "הכוח בך! 🦁"
-];
-var MSG_MASTERY_DONE = [
-  "הרגל נבנה! 🧠", "WOW — Master level! 🎓", "Bloom would be proud! 🏆",
-  "מאסטר! מושלם! 🌈"
-];
-var MSG_STREAK = [
-  "Keep the streak! 🔥", "🔥 " , "Unstoppable! ⚡", "ממשיך לנצח! 💪"
-];
-var MSG_BROKEN = [
-  "נסה שוב מההתחלה 💙", "Breathe — you got this! 😊",
-  "Start fresh — you're close! 🌟", "חזרה לדרך! 💪"
-];
+// ── Messages ──────────────────────────────────────────────
+var MSG_PASS    = ["מצוין! 🎉","כל הכבוד! ⭐","מדהים! 🚀","מושלם! 🏆","יפה מאוד! 💫","נהדר! 🎯"];
+var MSG_FAIL    = ["כמעט! נסה שוב 💪","אתה יכול! 🌟","עוד קצת! 😊","נסה שוב! 💎","הכוח בך! 🦁"];
+var MSG_MASTERY = ["הרגל נבנה! 🧠","מאסטר! 🎓","Bloom would be proud! 🏆","מושלם! 🌈"];
+var MSG_STREAK  = ["Keep the streak! 🔥","Unstoppable! ⚡","ממשיך לנצח! 💪"];
+var MSG_BROKEN  = ["נסה שוב מההתחלה 💙","אתה קרוב! 🌟","חזרה לדרך! 💪"];
+var MSG_SKIP    = ["ננסה בפעם הבאה 🤝","נמשיך קדימה 💙","נחזור לזה בהמשך 🔄"];
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-/* ── Show result ─────────────────────────────────────────── */
+// ── Show result ───────────────────────────────────────────
 function showResult(result) {
   var score  = result.score;
   var passed = result.passed;
+  var color  = score >= 85 ? "#4CAF50" : score >= 60 ? "#FF9800" : "#ef5350";
 
   // Score bar
-  var scoreRow  = document.getElementById("score-row");
-  var scoreFill = document.getElementById("score-fill");
-  var scoreNum  = document.getElementById("score-num");
+  var scoreRow = document.getElementById("score-row");
   scoreRow.style.display = "flex";
-  var color = score >= 85 ? "#4CAF50" : score >= 60 ? "#FF9800" : "#ef5350";
-  scoreFill.style.background = color;
-  scoreFill.style.width  = score + "%";
-  scoreNum.textContent   = score + "%";
-  scoreNum.style.color   = color;
+  document.getElementById("score-fill").style.background = color;
+  document.getElementById("score-fill").style.width      = score + "%";
+  document.getElementById("score-num").textContent  = score + "%";
+  document.getElementById("score-num").style.color  = color;
 
   // Word feedback
   var wfEl = document.getElementById("word-feedback");
   var wlEl = document.getElementById("word-list");
   wfEl.classList.add("visible");
   var html = "";
-  for (var i = 0; i < result.words.length; i++) {
-    var w   = result.words[i];
+  for (var i = 0; i < (result.words || []).length; i++) {
+    var w = result.words[i];
     var cls = w.status === "correct" ? "w-correct"
             : w.status === "wrong"   ? "w-wrong" : "w-missing";
     html += '<span class="w ' + cls + '">' + w.word + '</span> ';
   }
   wlEl.innerHTML = html;
 
-  // Result banner + mastery logic
   var banner = document.getElementById("result-banner");
   var icon   = document.getElementById("result-icon");
   var title  = document.getElementById("result-title");
   var sub    = document.getElementById("result-sub");
 
-  var consecutive = result.mastery_consecutive || 0;
-  var target      = result.mastery_target      || 0;
-  var broken      = result.streak_broken       || false;
+  // ── Skipped ──────────────────────────────────────────────
+  if (result.skipped) {
+    hideCloze(); hideMasteryBanner();
+    banner.className  = "result-banner visible fail";
+    icon.textContent  = "🤝";
+    title.textContent = pick(MSG_SKIP);
+    sub.textContent   = "עוברים למשפט הבא...";
+    waiting = true;
+    setTimeout(function() { waiting = false; loadQuestion(); }, 2000);
+    return;
+  }
 
+  // ── Cloze mode ───────────────────────────────────────────
+  if (result.cloze_mode) {
+    hideMasteryBanner();
+    if (result.cloze_done) {
+      // Just finished cloze successfully
+      hideCloze();
+      banner.className  = "result-banner visible pass";
+      icon.textContent  = "🧩";
+      title.textContent = "השלמת את המשפט! " + pick(MSG_PASS);
+      sub.textContent   = result.mastery_mode
+        ? "עכשיו לבנות הרגל — " + result.mastery_target + " פעמים ברצף"
+        : "עוברים למשפט הבא...";
+      if (result.advance) {
+        launchConfetti();
+        waiting = true;
+        setTimeout(function() { waiting = false; loadQuestion(); }, 2000);
+      } else if (result.mastery_mode) {
+        showMasteryBanner(result.mastery_consecutive || 0, result.mastery_target, false);
+        document.getElementById("mic-label").textContent = "הקש לדיבור";
+      }
+    } else {
+      // Still in cloze — wrong attempt
+      showClozeBanner(result.cloze_word, result.cloze_attempts_left || 3);
+      banner.className  = "result-banner visible fail";
+      icon.textContent  = "🧩";
+      title.textContent = "שכחת מילה — " + pick(MSG_FAIL);
+      sub.textContent   = "ציון: " + score + "% — אמור שוב עם המילה החסרה";
+      document.getElementById("mic-label").textContent = "הקש לדיבור";
+    }
+    return;
+  }
+
+  // ── Mastery mode ─────────────────────────────────────────
   if (result.mastery_mode) {
+    hideCloze();
     document.getElementById("english-ref").style.opacity = "1";
+    var consecutive = result.mastery_consecutive || 0;
+    var target      = result.mastery_target      || 0;
+    var broken      = result.streak_broken       || false;
 
     if (result.first_pass) {
       banner.className  = "result-banner visible pass";
@@ -606,7 +650,7 @@ function showResult(result) {
       banner.className  = "result-banner visible fail";
       icon.textContent  = "💙";
       title.textContent = pick(MSG_BROKEN);
-      sub.textContent   = "ציון: " + score + "% — צריך " + result.threshold + "% להמשיך.";
+      sub.textContent   = "ציון: " + score + "% — התחל רצף מחדש.";
     } else if (passed) {
       banner.className  = "result-banner visible pass";
       icon.textContent  = "🔥";
@@ -618,45 +662,55 @@ function showResult(result) {
     showMasteryBanner(consecutive, target, broken);
 
     if (result.advance) {
-      launchConfetti();
-      hideMasteryBanner();
+      launchConfetti(); hideMasteryBanner();
       banner.className  = "result-banner visible pass";
       icon.textContent  = "🏆";
-      title.textContent = pick(MSG_MASTERY_DONE);
+      title.textContent = pick(MSG_MASTERY);
       sub.textContent   = "עוברים למשפט הבא...";
       waiting = true;
       setTimeout(function() { waiting = false; loadQuestion(); }, 2200);
     } else {
       document.getElementById("mic-label").textContent =
-        broken ? "טפח לדיבור — התחל מחדש" : "המשך — טפח לדיבור";
+        broken ? "הקש — התחל רצף מחדש" : "הקש לדיבור";
     }
+    return;
+  }
 
+  // ── Normal mode ───────────────────────────────────────────
+  hideCloze();
+  if (result.cloze_mode === undefined && result.cloze_word) {
+    // First pass — enter cloze
+    showClozeBanner(result.cloze_word, 3);
+    banner.className  = "result-banner visible pass";
+    icon.textContent  = "🌟";
+    title.textContent = pick(MSG_PASS) + " — עכשיו השלם מילה חסרה";
+    sub.textContent   = "אמור את המשפט שוב כולל המילה החסרה";
+    document.getElementById("english-ref").style.opacity = "1";
+    return;
+  }
+
+  if (passed) {
+    launchConfetti();
+    banner.className  = "result-banner visible pass";
+    icon.textContent  = "🎉";
+    title.textContent = pick(MSG_PASS);
+    sub.textContent   = "ציון: " + score + "% — עוברים הלאה...";
   } else {
-    // Normal mode
-    if (passed) {
-      launchConfetti();
-      banner.className  = "result-banner visible pass";
-      icon.textContent  = "🎉";
-      title.textContent = pick(MSG_PASS);
-      sub.textContent   = "ציון: " + score + "% — עוברים הלאה...";
-    } else {
-      banner.className  = "result-banner visible fail";
-      icon.textContent  = "💪";
-      title.textContent = pick(MSG_FAIL);
-      sub.textContent   = "ציון: " + score + "% — צריך " + result.threshold + "% לעבור.";
-    }
-    document.getElementById("mic-label").textContent =
-      passed ? "Moving on…" : "טפח לנסות שוב";
+    banner.className  = "result-banner visible fail";
+    icon.textContent  = "💪";
+    title.textContent = pick(MSG_FAIL);
+    sub.textContent   = "ציון: " + score + "% — צריך " + result.threshold + "% לעבור.";
+  }
+  document.getElementById("mic-label").textContent = passed ? "עוברים..." : "הקש לנסות שוב";
 
-    if (result.advance) {
-      waiting = true;
-      document.getElementById("english-ref").style.opacity = "1";
-      setTimeout(function() { waiting = false; loadQuestion(); }, 2000);
-    }
+  if (result.advance) {
+    waiting = true;
+    document.getElementById("english-ref").style.opacity = "1";
+    setTimeout(function() { waiting = false; loadQuestion(); }, 2000);
   }
 }
 
-/* ── Reset UI ────────────────────────────────────────────── */
+// ── Reset UI ──────────────────────────────────────────────
 function resetUI() {
   processing = false;
   var sb = document.getElementById("spoken-box");
@@ -668,80 +722,275 @@ function resetUI() {
   document.getElementById("score-num").textContent = "-";
   document.getElementById("result-banner").className = "result-banner";
   document.getElementById("english-ref").style.opacity = "0";
-  document.getElementById("mic-label").textContent = "Tap to speak";
+  document.getElementById("mic-label").textContent = "הקש לדיבור";
   document.getElementById("mic-btn").classList.remove("listening", "mastery-active");
+  document.getElementById("mic-btn").style.background = "";
   hideMasteryBanner();
-  masteryTotal = 0;
+  hideCloze();
 }
 
-/* ── Done screen ─────────────────────────────────────────── */
-function showDoneScreen(q) {
+// ══════════════════════════════════════════════════════════
+// EXAM MODE
+// ══════════════════════════════════════════════════════════
+var examSentences  = [];   // [{sentence, correct_en}, ...]
+var examIndex      = 0;
+var examResults    = [];   // [{sentence, score, passed}, ...]
+var examMode       = false;
+
+function startExamMode(practiceData) {
+  // Build exam sentence list from practice results
+  examSentences = practiceData
+    .filter(function(r) { return !r.skipped; })
+    .map(function(r) { return { he: null, en: r.sentence }; });
+
+  if (!examSentences.length) {
+    showFinalReport(practiceData, []);
+    return;
+  }
+
+  examMode    = true;
+  examIndex   = 0;
+  examResults = [];
+
+  // Show exam intro screen
+  document.getElementById("main-card").style.display = "block";
+  document.getElementById("done-card").style.display = "none";
+
+  document.getElementById("main-card").innerHTML = buildExamIntroHTML(examSentences.length);
+}
+
+function buildExamIntroHTML(count) {
+  return '<div style="text-align:center;padding:20px 0">' +
+    '<div style="font-size:52px;margin-bottom:12px">🎓</div>' +
+    '<h2 style="font-size:22px;font-weight:800;color:#4318D1;margin-bottom:10px">מבחן סיכום</h2>' +
+    '<p style="font-size:15px;color:#555;margin-bottom:8px">תאמר את ' + count + ' המשפטים שלמדת ברצף.</p>' +
+    '<p style="font-size:13px;color:#888;margin-bottom:28px">לא תקבל פידבק תוך כדי — רק ניתוח מלא בסוף.</p>' +
+    '<button class="btn btn-p" style="width:100%;padding:14px;font-size:16px" ' +
+      'onclick="runExamQuestion()">התחל מבחן ←</button>' +
+  '</div>';
+}
+
+function runExamQuestion() {
+  if (examIndex >= examSentences.length) {
+    examMode = false;
+    showFinalReport(practiceResults, examResults);
+    return;
+  }
+
+  var q      = examSentences[examIndex];
+  var total  = examSentences.length;
+  var pct    = Math.round((examIndex / total) * 100);
+
+  document.getElementById("main-card").innerHTML =
+    '<div id="exam-wrap">' +
+      '<div style="font-size:11px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">מבחן — משפט ' + (examIndex+1) + ' מתוך ' + total + '</div>' +
+      '<div style="background:#ddd;border-radius:20px;height:6px;margin-bottom:18px">' +
+        '<div style="background:#4318D1;height:6px;border-radius:20px;width:' + pct + '%;transition:width .4s"></div>' +
+      '</div>' +
+      '<div class="hebrew-label">קרא באנגלית:</div>' +
+      '<div class="hebrew-text" id="exam-he" style="direction:rtl;text-align:right">' +
+        (q.he || "—") + '</div>' +
+      '<div id="exam-spoken" style="font-size:14px;color:#888;min-height:22px;margin:10px 0"></div>' +
+      '<button class="mic-btn" id="exam-mic" onclick="startExamRecognition()" style="margin:0 auto 10px">' +
+        '<svg viewBox="0 0 24 24" style="width:32px;height:32px;fill:white"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3.03 2.93 5.37 5.91 5.82V20c0 .55.45 1 1 1s1-.45 1-1v-2.04c2.98-.45 5.42-2.79 5.91-5.82.1-.6-.39-1.14-1-1.14z"/></svg>' +
+      '</button>' +
+      '<div id="exam-label" style="text-align:center;font-size:13px;color:#888;font-weight:600;margin-bottom:4px">הקש לדיבור</div>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="skipExamQuestion()">דלג על משפט זה</button>' +
+    '</div>';
+
+  // No Hebrew in exam (it's the challenge)
+  if (!q.he) {
+    document.getElementById("exam-he").textContent = "— אין תרגום — דבר מה שאתה זוכר";
+  }
+}
+
+function startExamRecognition() {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+
+  var micBtn   = document.getElementById("exam-mic");
+  var label    = document.getElementById("exam-label");
+  var spokenEl = document.getElementById("exam-spoken");
+  var rec      = new SR();
+  rec.lang = "en-US"; rec.continuous = true; rec.interimResults = false;
+
+  var finalText = "", submitted = false, silenceTimer = null;
+  micBtn.classList.add("listening");
+  label.textContent = "מקשיב...";
+
+  rec.onresult = function(event) {
+    var cf = "";
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) cf += event.results[i][0].transcript + " ";
+    }
+    if (cf.trim()) finalText = cf.trim();
+    spokenEl.textContent = finalText;
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(function() { if (!submitted) rec.stop(); }, 1500);
+  };
+
+  rec.onend = function() {
+    micBtn.classList.remove("listening");
+    if (submitted) return;
+    submitted = true;
+    if (!finalText.trim()) {
+      label.textContent = "הקש לדיבור";
+      return;
+    }
+    label.textContent = "שומר...";
+    var correct = examSentences[examIndex].en;
+    fetch("/score-only", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({spoken: finalText.trim(), correct: correct})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      examResults.push({
+        sentence: correct,
+        score:    res.score,
+        passed:   res.passed,
+        spoken:   finalText.trim(),
+      });
+      examIndex++;
+      setTimeout(runExamQuestion, 400);
+    })
+    .catch(function() {
+      label.textContent = "שגיאה — נסה שוב";
+    });
+  };
+
+  rec.onerror = function() {
+    micBtn.classList.remove("listening");
+    label.textContent = "שגיאה — נסה שוב";
+    submitted = true;
+  };
+  rec.start();
+}
+
+function skipExamQuestion() {
+  examResults.push({
+    sentence: examSentences[examIndex].en,
+    score:    0, passed: false, skipped: true,
+  });
+  examIndex++;
+  runExamQuestion();
+}
+
+// ── Final report ──────────────────────────────────────────
+function showFinalReport(practiceData, examData) {
   document.getElementById("main-card").style.display = "none";
   var done = document.getElementById("done-card");
   done.style.display = "block";
 
-  var results  = q.results  || [];
-  var passed   = q.passed   || 0;
-  var total    = q.total    || results.length;
-  var avgScore = q.avg_score || 0;
-  var color    = avgScore >= 85 ? "#4CAF50" : avgScore >= 60 ? "#FF9800" : "#ef5350";
-
-  var rowsHtml = "";
-  for (var i = 0; i < results.length; i++) {
-    var r   = results[i];
-    var sc  = r.score;
-    var rc  = sc >= 85 ? "#4CAF50" : sc >= 60 ? "#FF9800" : "#ef5350";
-    var ico = r.passed ? "&#10003;" : "&#10007;";
-    var ibg = r.passed ? "#e8f5e9" : "#ffebee";
-    var ifc = r.passed ? "#2e7d32" : "#c62828";
-    var extra = r.mastery_reps > 0
-      ? '<span style="font-size:11px;color:#e65100;margin-left:6px">+' +
-        r.mastery_reps + ' mastery</span>' : "";
-    rowsHtml +=
-      '<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;' +
-      'border-radius:10px;background:#f8f7ff;border-left:5px solid ' + rc +
-      ';margin-bottom:8px;">' +
-      '<span style="font-size:18px;font-weight:800;color:' + ifc +
-      ';background:' + ibg + ';width:28px;height:28px;border-radius:50%;' +
-      'display:grid;place-items:center;">' + ico + '</span>' +
-      '<span style="flex:1;font-size:14px;color:#1a1033;">' +
-        r.sentence + extra + '</span>' +
-      '<span style="font-size:12px;font-weight:700;color:#fff;background:' +
-      rc + ';padding:3px 10px;border-radius:20px;">' + sc + '%</span></div>';
+  function statBox(label, val, color) {
+    return '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
+      '<div style="font-size:28px;font-weight:800;color:' + (color||"#4318D1") + '">' + val + '</div>' +
+      '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">' + label + '</div></div>';
   }
 
+  function sentenceRow(r, idx) {
+    var sc  = r.score || 0;
+    var rc  = sc >= 85 ? "#4CAF50" : sc >= 60 ? "#FF9800" : "#ef5350";
+    var ico = r.skipped ? "⏭" : (r.passed ? "✓" : "✗");
+    var ibg = r.skipped ? "#f0f0f0" : (r.passed ? "#e8f5e9" : "#ffebee");
+    var ifc = r.skipped ? "#888"     : (r.passed ? "#2e7d32" : "#c62828");
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;' +
+      'border-radius:10px;background:#f8f7ff;border-left:5px solid ' + rc +
+      ';margin-bottom:8px;">' +
+      '<span style="font-size:14px;font-weight:800;color:' + ifc + ';background:' + ibg +
+      ';width:28px;height:28px;border-radius:50%;display:grid;place-items:center;">' + ico + '</span>' +
+      '<span style="flex:1;font-size:13px;color:#1a1033">' + r.sentence + '</span>' +
+      (r.skipped ? '<span style="font-size:11px;color:#888">דולג</span>'
+        : '<span style="font-size:12px;font-weight:700;color:#fff;background:' + rc +
+          ';padding:3px 10px;border-radius:20px;">' + sc + '%</span>') +
+      '</div>';
+  }
+
+  // Practice stats
+  var pTotal  = practiceData.length;
+  var pPassed = practiceData.filter(function(r){ return r.passed && !r.skipped; }).length;
+  var pAvg    = pTotal ? Math.round(practiceData.reduce(function(a,r){ return a + (r.score||0); }, 0) / pTotal) : 0;
+
+  // Exam stats
+  var eTotal  = examData.length;
+  var ePassed = examData.filter(function(r){ return r.passed; }).length;
+  var eAvg    = eTotal ? Math.round(examData.reduce(function(a,r){ return a + (r.score||0); }, 0) / eTotal) : 0;
+  var eColor  = eAvg >= 85 ? "#4CAF50" : eAvg >= 60 ? "#FF9800" : "#ef5350";
+
+  var practiceRows = practiceData.map(sentenceRow).join("");
+  var examRows     = examData.map(sentenceRow).join("");
+
   done.innerHTML =
-    '<div style="text-align:center;padding:8px 0 20px">' +
-      '<div style="font-size:48px;margin-bottom:10px">&#127881;</div>' +
-      '<h2 style="font-size:26px;font-weight:800;color:#4318D1;margin-bottom:6px">' +
-        'Session Complete!</h2>' +
-      '<p style="font-size:14px;color:#888;margin-bottom:20px">' +
-        studentName + ' — here is how you did:</p>' +
-      '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:24px;flex-wrap:wrap">' +
-        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
-          '<div style="font-size:30px;font-weight:800;color:#4318D1">' +
-            passed + '/' + total + '</div>' +
-          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Passed</div>' +
-        '</div>' +
-        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
-          '<div style="font-size:30px;font-weight:800;color:' + color + '">' +
-            avgScore + '%</div>' +
-          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Avg Score</div>' +
-        '</div>' +
-        '<div style="background:#ede7ff;border-radius:14px;padding:14px 20px;min-width:90px">' +
-          '<div style="font-size:30px;font-weight:800;color:#4318D1">' +
-            Math.round((passed / Math.max(total,1)) * 100) + '%</div>' +
-          '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-top:2px">Accuracy</div>' +
-        '</div>' +
+    '<div style="text-align:center;padding:8px 0 16px">' +
+      '<div style="font-size:48px;margin-bottom:8px">🎓</div>' +
+      '<h2 style="font-size:24px;font-weight:800;color:#4318D1;margin-bottom:4px">סיום סשן — ' + studentName + '</h2>' +
+      '<p style="font-size:13px;color:#888;margin-bottom:20px">תרגול + מבחן</p>' +
+
+      '<h3 style="font-size:14px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">תרגול</h3>' +
+      '<div style="display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap">' +
+        statBox("עברו", pPassed + "/" + pTotal) +
+        statBox("ממוצע", pAvg + "%") +
       '</div>' +
-      '<div style="text-align:left;margin-bottom:20px">' + rowsHtml + '</div>' +
+      '<div style="text-align:right;margin-bottom:24px">' + practiceRows + '</div>' +
+
+      (eTotal ? (
+        '<h3 style="font-size:14px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">מבחן סיכום</h3>' +
+        '<div style="display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap">' +
+          statBox("עברו", ePassed + "/" + eTotal) +
+          statBox("ממוצע", eAvg + "%", eColor) +
+        '</div>' +
+        '<div style="text-align:right;margin-bottom:24px">' + examRows + '</div>'
+      ) : "") +
+
       '<button class="btn btn-p" style="width:100%;padding:13px;font-size:16px" ' +
-        'onclick="resetSession()">&#128260; Start Again</button>' +
+        'onclick="resetSession()">&#128260; התחל מחדש</button>' +
     '</div>';
+
+  launchConfetti();
 }
 
+// ── Confetti ──────────────────────────────────────────────
+function launchConfetti() {
+  var canvas = document.getElementById("confetti-canvas");
+  var ctx    = canvas.getContext("2d");
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  canvas.style.display = "block";
+  var colors = ["#4318D1","#7c3aed","#4CAF50","#FF9800","#FFC107","#2196F3","#ef5350"];
+  var pieces = [];
+  for (var i = 0; i < 140; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width, y: Math.random() * -canvas.height * 0.5,
+      w: Math.random() * 11 + 5, h: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * 360, vx: (Math.random() - 0.5) * 3,
+      vy: Math.random() * 4 + 2, vr: (Math.random() - 0.5) * 9
+    });
+  }
+  var ticks = 0;
+  (function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var alive = false;
+    for (var j = 0; j < pieces.length; j++) {
+      var p = pieces[j];
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      if (p.y < canvas.height) alive = true;
+      ctx.save(); ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    }
+    ticks++;
+    if (alive && ticks < 220) requestAnimationFrame(draw);
+    else { canvas.style.display = "none"; ctx.clearRect(0,0,canvas.width,canvas.height); }
+  })();
+}
+
+// ── Reset session ─────────────────────────────────────────
 function resetSession() {
-  studentId = studentName + "_" + Date.now();   // new ID for new round
+  studentId = studentName + "_" + Date.now();
+  examMode = false; examIndex = 0; examResults = []; practiceResults = [];
   fetch("/reset", {
     method: "POST",
     headers: {"Content-Type": "application/json"},

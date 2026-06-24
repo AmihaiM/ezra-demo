@@ -2,3 +2,4 @@ flask
 gunicorn
 gspread
 google-auth
+supabase>=2.0.0

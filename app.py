@@ -131,16 +131,48 @@ def mastery_target_for(failures):
     return min(failures + 2, 5)
 
 
+MAX_FAILURES = 7   # skip sentence after this many failures
+
+COMMON_VERBS = {
+    'am','is','are','was','were','have','has','had','do','does','did',
+    'go','went','come','came','get','got','make','made','know','think',
+    'say','said','see','saw','take','took','want','use','find','give',
+    'tell','work','call','need','feel','try','leave','put','keep','run',
+    'start','began','begin','write','read','speak','listen','play','help',
+    'learn','study','live','move','walk','talk','meet','ask','answer',
+    'understand','remember','forget','love','like','enjoy','visit',
+    'travel','drive','fly','sit','stand','eat','drink','buy','sell',
+}
+
+def detect_cloze_word(sentence):
+    """Return the best word to hide for cloze practice, or None."""
+    words = normalize(sentence).split()
+    if len(words) < 3:
+        return None
+    # Prefer a verb (skip first word, usually "I" or "The")
+    for w in words[1:]:
+        if w in COMMON_VERBS:
+            return w
+    # Fallback: longest non-trivial word (not first or last)
+    candidates = [(len(w), w) for w in words[1:-1] if len(w) > 4]
+    if candidates:
+        return sorted(candidates, reverse=True)[0][1]
+    return None
+
+
 def new_session(name):
     return {
-        "name":               name,
-        "current":            0,
-        "failed_attempts":    0,   # failures on current sentence
-        "mastery_target":     0,   # consecutive correct needed (0 = not in mastery)
-        "mastery_consecutive": 0,  # current streak
-        "mastery_score":      0,   # latest passing score
-        "sentences":          [],
-        "completed":          False,
+        "name":                name,
+        "current":             0,
+        "failed_attempts":     0,   # failures on current sentence
+        "mastery_target":      0,   # consecutive correct needed (0 = not in mastery)
+        "mastery_consecutive": 0,   # current streak
+        "mastery_score":       0,   # latest passing score
+        "cloze_active":        False,
+        "cloze_word":          None,
+        "cloze_attempts":      0,
+        "sentences":           [],
+        "completed":           False,
     }
 
 
@@ -221,17 +253,19 @@ def post_answer():
     base = dict(correct=correct, spoken=spoken, words=words,
                 threshold=PASS_THRESHOLD, score=score, passed=passed)
 
-    def record_and_advance():
+    def record_and_advance(final_score=None, skipped=False):
         s["sentences"].append({
             "sentence":    correct,
-            "score":       s["mastery_score"] or score,
-            "passed":      True,
+            "score":       final_score or s["mastery_score"] or score,
+            "passed":      not skipped,
+            "skipped":     skipped,
             "attempts":    s["failed_attempts"] + s["mastery_target"],
             "mastery_reps": s["mastery_target"],
         })
         log_result(
             s["name"], correct,
-            s["mastery_score"] or score, True,
+            final_score or s["mastery_score"] or score,
+            not skipped,
             s["failed_attempts"] + s["mastery_target"],
             s["mastery_target"],
         )
@@ -240,24 +274,77 @@ def post_answer():
         s["mastery_target"]      = 0
         s["mastery_consecutive"] = 0
         s["mastery_score"]       = 0
+        s["cloze_active"]        = False
+        s["cloze_word"]          = None
+        s["cloze_attempts"]      = 0
 
-    # ── In mastery mode ───────────────────────────────────────
+    def enter_cloze(first_score):
+        """Activate cloze mode after first successful pronunciation."""
+        cw = detect_cloze_word(correct)
+        if cw:
+            s["cloze_active"]   = True
+            s["cloze_word"]     = cw
+            s["cloze_attempts"] = 0
+            s["mastery_score"]  = first_score
+            return cw
+        return None
+
+    # ── Cloze mode ────────────────────────────────────────────
+    if s["cloze_active"]:
+        if passed:
+            # Cloze passed — now enter mastery (if needed) or advance
+            cw = s["cloze_word"]
+            s["cloze_active"] = False
+            s["cloze_word"]   = None
+            if s["mastery_target"] > 0:
+                # Already queued for mastery — start mastery streak
+                s["mastery_consecutive"] = 1
+                return jsonify({**base, "cloze_done": True,
+                                "mastery_mode": True, "first_pass": True,
+                                "streak_broken": False, "advance": False,
+                                **mastery_payload(s)})
+            else:
+                record_and_advance(final_score=s["mastery_score"])
+                return jsonify({**base, "cloze_done": True,
+                                "mastery_mode": False, "advance": True,
+                                **mastery_payload(s)})
+        else:
+            s["cloze_attempts"] += 1
+            if s["cloze_attempts"] >= 3:
+                # Too many cloze failures — proceed anyway
+                cw = s["cloze_word"]
+                s["cloze_active"] = False
+                s["cloze_word"]   = None
+                if s["mastery_target"] > 0:
+                    s["mastery_consecutive"] = 0
+                    return jsonify({**base, "cloze_done": True,
+                                    "mastery_mode": True, "first_pass": True,
+                                    "streak_broken": False, "advance": False,
+                                    **mastery_payload(s)})
+                else:
+                    record_and_advance(final_score=s["mastery_score"])
+                    return jsonify({**base, "cloze_done": True,
+                                    "mastery_mode": False, "advance": True,
+                                    **mastery_payload(s)})
+            return jsonify({**base, "cloze_mode": True,
+                            "cloze_word": s["cloze_word"],
+                            "cloze_attempts_left": 3 - s["cloze_attempts"],
+                            "advance": False, **mastery_payload(s)})
+
+    # ── Mastery mode ──────────────────────────────────────────
     if s["mastery_target"] > 0:
         if passed:
             s["mastery_consecutive"] += 1
             s["mastery_score"]        = score
-
             if s["mastery_consecutive"] >= s["mastery_target"]:
                 record_and_advance()
                 return jsonify({**base, "mastery_mode": False,
                                 "mastery_mode_done": True,
                                 "advance": True, **mastery_payload(s)})
-
             return jsonify({**base, "mastery_mode": True,
                             "streak_broken": False, "advance": False,
                             **mastery_payload(s)})
         else:
-            # Streak broken — reset consecutive
             s["mastery_consecutive"] = 0
             return jsonify({**base, "mastery_mode": True,
                             "streak_broken": True, "advance": False,
@@ -266,8 +353,15 @@ def post_answer():
     # ── Normal mode ───────────────────────────────────────────
     if passed:
         target = mastery_target_for(s["failed_attempts"])
+        cw = enter_cloze(score)   # always try cloze first
+
         if target == 0:
-            # Perfect first attempt — advance directly
+            if cw:
+                # Cloze before advancing
+                return jsonify({**base, "cloze_mode": True, "cloze_word": cw,
+                                "mastery_mode": False, "advance": False,
+                                **mastery_payload(s)})
+            # Perfect — advance directly
             s["sentences"].append({
                 "sentence": correct, "score": score,
                 "passed": True, "attempts": 1, "mastery_reps": 0,
@@ -278,21 +372,30 @@ def post_answer():
             return jsonify({**base, "mastery_mode": False,
                             "advance": True, **mastery_payload(s)})
         else:
-            # Enter mastery: first pass counts as consecutive #1
+            # Queue mastery, but do cloze first
             s["mastery_target"]      = target
+            s["mastery_consecutive"] = 0   # cloze counts as the warm-up
+            if cw:
+                return jsonify({**base, "cloze_mode": True, "cloze_word": cw,
+                                "first_pass": True, "mastery_mode": False,
+                                "advance": False, **mastery_payload(s)})
+            # No cloze word — enter mastery directly
             s["mastery_consecutive"] = 1
             s["mastery_score"]       = score
-
-            if s["mastery_consecutive"] >= target:   # edge case: target=1
+            if s["mastery_consecutive"] >= target:
                 record_and_advance()
                 return jsonify({**base, "mastery_mode": False,
                                 "advance": True, **mastery_payload(s)})
-
             return jsonify({**base, "mastery_mode": True,
                             "first_pass": True, "streak_broken": False,
                             "advance": False, **mastery_payload(s)})
     else:
         s["failed_attempts"] += 1
+        if s["failed_attempts"] >= MAX_FAILURES:
+            # Skip this sentence
+            record_and_advance(final_score=score, skipped=True)
+            return jsonify({**base, "skipped": True, "advance": True,
+                            "mastery_mode": False, **mastery_payload(s)})
         return jsonify({**base, "mastery_mode": False, "advance": False,
                         "failed_attempts": s["failed_attempts"],
                         **mastery_payload(s)})
@@ -383,6 +486,18 @@ def teacher_data():
             "failed_current":     s["failed_attempts"],
         })
     return jsonify(out)
+
+
+@app.route("/score-only", methods=["POST"])
+def score_only():
+    """Exam mode: score without affecting session state."""
+    data    = request.get_json(force=True)
+    spoken  = data.get("spoken", "")
+    correct = data.get("correct", "")
+    score   = similarity(spoken, correct)
+    passed  = score >= PASS_THRESHOLD
+    words   = word_level(spoken, correct)
+    return jsonify(score=score, passed=passed, words=words, threshold=PASS_THRESHOLD)
 
 
 if __name__ == "__main__":
