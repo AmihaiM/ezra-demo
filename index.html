@@ -237,8 +237,8 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
   <div class="english-ref" id="english-ref" style="opacity:0"></div>
 
   <div class="btn-row">
-    <button class="btn btn-p"     onclick="playSentence()">&#128266; Play</button>
-    <button class="btn btn-ghost" onclick="revealEnglish()">&#128065; Show English</button>
+    <button class="btn btn-p"     id="play-btn" onclick="playSentence()">&#128266; Play</button>
+    <button class="btn btn-ghost" id="show-btn" onclick="revealEnglish()">&#128065; Show English</button>
   </div>
 
   <button class="mic-btn" id="mic-btn" onclick="startRecognition()">
@@ -269,7 +269,7 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
   <div id="cloze-banner" style="display:none;background:#e0f2fe;border:2px solid #0284c7;
        border-radius:14px;padding:16px 18px;margin-top:14px">
     <h3 style="font-size:15px;font-weight:700;color:#0369a1;margin-bottom:4px">
-      &#129513; &#1492;&#1513;&#1500;&#1501; &#1488;&#1514; &#1492;&#1502;&#1513;&#1508;&#1496;
+      &#129513; &#1488;&#1502;&#1493;&#1512; &#1488;&#1514; &#1492;&#1502;&#1513;&#1508;&#1496; &#1492;&#1502;&#1500;&#1488;
     </h3>
     <p id="cloze-msg" style="font-size:13px;color:#075985;margin-bottom:8px">
       &#1488;&#1502;&#1493;&#1512; &#1488;&#1514; &#1492;&#1502;&#1513;&#1508;&#1496; &#1506;&#1501; &#1492;&#1502;&#1497;&#1500;&#1492; &#1492;&#1495;&#1505;&#1512;&#1492;
@@ -305,6 +305,7 @@ var waiting      = false;
 var processing   = false;
 var voiceGender  = "female";
 var practiceResults = [];  // saved from practice phase for exam
+var questionMap     = {};  // en → he, built during practice
 
 // \u2500\u2500 Voice selector \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function setVoiceGender(gender) {
@@ -355,7 +356,7 @@ function startSession() {
       studentName = name;
       studentId   = name + "_" + Date.now();
       document.getElementById("name-overlay").style.display = "none";
-      document.getElementById("student-tag").textContent = "\u1F464 " + name;
+      document.getElementById("student-tag").textContent = "\uD83D\uDC64 " + name;
       loadQuestion();
     } else {
       errBox.style.display = "block";
@@ -377,6 +378,7 @@ function loadQuestion() {
         return;
       }
       currentQ = q;
+      if (q.he) questionMap[q.en] = q.he;
       document.getElementById("hebrew").textContent      = q.he;
       document.getElementById("english-ref").textContent = q.en;
       document.getElementById("prog-label").textContent  =
@@ -430,7 +432,9 @@ function showClozeBanner(clozeWord, attemptsLeft) {
     ? "\u05E0\u05E1\u05D9\u05D5\u05DF " + (4 - attemptsLeft) + "/3 \u2014 \u05D0\u05DE\u05D5\u05E8 \u05D0\u05EA \u05D4\u05DE\u05E9\u05E4\u05D8 \u05D4\u05DE\u05DC\u05D0 \u05DB\u05D5\u05DC\u05DC \u05D4\u05DE\u05D9\u05DC\u05D4 \u05D4\u05D7\u05E1\u05E8\u05D4"
     : "\u05D0\u05DE\u05D5\u05E8 \u05D0\u05EA \u05D4\u05DE\u05E9\u05E4\u05D8 \u05D4\u05DE\u05DC\u05D0 \u05DB\u05D5\u05DC\u05DC \u05D4\u05DE\u05D9\u05DC\u05D4 \u05D4\u05D7\u05E1\u05E8\u05D4";
   banner.style.display = "block";
-  document.getElementById("english-ref").style.opacity = "1";
+  document.getElementById("english-ref").style.opacity = "0";
+  document.getElementById("play-btn").style.display = "none";
+  document.getElementById("show-btn").style.display = "none";
   document.getElementById("mic-btn").style.background  = "#0284c7";
   document.getElementById("mic-label").textContent = "\u05D4\u05E7\u05E9 \u05DC\u05D3\u05D9\u05D1\u05D5\u05E8";
 }
@@ -438,6 +442,8 @@ function showClozeBanner(clozeWord, attemptsLeft) {
 function hideCloze() {
   document.getElementById("cloze-banner").style.display = "none";
   document.getElementById("mic-btn").style.background = "";
+  document.getElementById("play-btn").style.display = "";
+  document.getElementById("show-btn").style.display = "";
 }
 
 // \u2500\u2500 Mastery banner \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -457,7 +463,7 @@ function showMasteryBanner(consecutive, target, broken) {
     banner.querySelector("h3").textContent = "\u2B50 \u05DE\u05E6\u05D1 \u05E9\u05DC\u05D9\u05D8\u05D4 \u2014 Benjamin Bloom";
     var remaining = target - consecutive;
     msg.textContent = consecutive > 0
-      ? "\u1F525 \u05E8\u05E6\u05E3: " + consecutive + "/" + target + " \u2014 " +
+      ? "\uD83D\uDD25 \u05E8\u05E6\u05E3: " + consecutive + "/" + target + " \u2014 " +
         (remaining === 1 ? "\u05E2\u05D5\u05D3 \u05D0\u05D7\u05EA!" : "\u05E2\u05D5\u05D3 " + remaining + " \u05D1\u05E8\u05E6\u05E3.")
       : "\u05D0\u05DE\u05D5\u05E8 \u05E0\u05DB\u05D5\u05DF " + target + " \u05E4\u05E2\u05DE\u05D9\u05DD \u05D1\u05E8\u05E6\u05E3.";
     if (consecutive > 0) banner.classList.add("streak-ok");
@@ -549,12 +555,12 @@ function startRecognition() {
 }
 
 // \u2500\u2500 Messages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var MSG_PASS    = ["\u05DE\u05E6\u05D5\u05D9\u05DF! \u1F389","\u05DB\u05DC \u05D4\u05DB\u05D1\u05D5\u05D3! \u2B50","\u05DE\u05D3\u05D4\u05D9\u05DD! \u1F680","\u05DE\u05D5\u05E9\u05DC\u05DD! \u1F3C6","\u05D9\u05E4\u05D4 \u05DE\u05D0\u05D5\u05D3! \u1F4AB","\u05E0\u05D4\u05D3\u05E8! \u1F3AF"];
-var MSG_FAIL    = ["\u05DB\u05DE\u05E2\u05D8! \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u1F4AA","\u05D0\u05EA\u05D4 \u05D9\u05DB\u05D5\u05DC! \u1F31F","\u05E2\u05D5\u05D3 \u05E7\u05E6\u05EA! \u1F60A","\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1! \u1F48E","\u05D4\u05DB\u05D5\u05D7 \u05D1\u05DA! \u1F981"];
-var MSG_MASTERY = ["\u05D4\u05E8\u05D2\u05DC \u05E0\u05D1\u05E0\u05D4! \u1F9E0","\u05DE\u05D0\u05E1\u05D8\u05E8! \u1F393","Bloom would be proud! \u1F3C6","\u05DE\u05D5\u05E9\u05DC\u05DD! \u1F308"];
-var MSG_STREAK  = ["Keep the streak! \u1F525","Unstoppable! \u26A1","\u05DE\u05DE\u05E9\u05D9\u05DA \u05DC\u05E0\u05E6\u05D7! \u1F4AA"];
-var MSG_BROKEN  = ["\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05DE\u05D4\u05D4\u05EA\u05D7\u05DC\u05D4 \u1F499","\u05D0\u05EA\u05D4 \u05E7\u05E8\u05D5\u05D1! \u1F31F","\u05D7\u05D6\u05E8\u05D4 \u05DC\u05D3\u05E8\u05DA! \u1F4AA"];
-var MSG_SKIP    = ["\u05E0\u05E0\u05E1\u05D4 \u05D1\u05E4\u05E2\u05DD \u05D4\u05D1\u05D0\u05D4 \u1F91D","\u05E0\u05DE\u05E9\u05D9\u05DA \u05E7\u05D3\u05D9\u05DE\u05D4 \u1F499","\u05E0\u05D7\u05D6\u05D5\u05E8 \u05DC\u05D6\u05D4 \u05D1\u05D4\u05DE\u05E9\u05DA \u1F504"];
+var MSG_PASS    = ["\u05DE\u05E6\u05D5\u05D9\u05DF! \uD83C\uDF89","\u05DB\u05DC \u05D4\u05DB\u05D1\u05D5\u05D3! \u2B50","\u05DE\u05D3\u05D4\u05D9\u05DD! \uD83D\uDE80","\u05DE\u05D5\u05E9\u05DC\u05DD! \uD83C\uDFC6","\u05D9\u05E4\u05D4 \u05DE\u05D0\u05D5\u05D3! \uD83D\uDCAB","\u05E0\u05D4\u05D3\u05E8! \uD83C\uDFAF"];
+var MSG_FAIL    = ["\u05DB\u05DE\u05E2\u05D8! \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \uD83D\uDCAA","\u05D0\u05EA\u05D4 \u05D9\u05DB\u05D5\u05DC! \uD83C\uDF1F","\u05E2\u05D5\u05D3 \u05E7\u05E6\u05EA! \uD83D\uDE0A","\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1! \uD83D\uDC8E","\u05D4\u05DB\u05D5\u05D7 \u05D1\u05DA! \uD83E\uDD81"];
+var MSG_MASTERY = ["\u05D4\u05E8\u05D2\u05DC \u05E0\u05D1\u05E0\u05D4! \uD83E\uDDE0","\u05DE\u05D0\u05E1\u05D8\u05E8! \uD83C\uDF93","Bloom would be proud! \uD83C\uDFC6","\u05DE\u05D5\u05E9\u05DC\u05DD! \uD83C\uDF08"];
+var MSG_STREAK  = ["Keep the streak! \uD83D\uDD25","Unstoppable! \u26A1","\u05DE\u05DE\u05E9\u05D9\u05DA \u05DC\u05E0\u05E6\u05D7! \uD83D\uDCAA"];
+var MSG_BROKEN  = ["\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05DE\u05D4\u05D4\u05EA\u05D7\u05DC\u05D4 \uD83D\uDC99","\u05D0\u05EA\u05D4 \u05E7\u05E8\u05D5\u05D1! \uD83C\uDF1F","\u05D7\u05D6\u05E8\u05D4 \u05DC\u05D3\u05E8\u05DA! \uD83D\uDCAA"];
+var MSG_SKIP    = ["\u05E0\u05E0\u05E1\u05D4 \u05D1\u05E4\u05E2\u05DD \u05D4\u05D1\u05D0\u05D4 \uD83E\uDD1D","\u05E0\u05DE\u05E9\u05D9\u05DA \u05E7\u05D3\u05D9\u05DE\u05D4 \uD83D\uDC99","\u05E0\u05D7\u05D6\u05D5\u05E8 \u05DC\u05D6\u05D4 \u05D1\u05D4\u05DE\u05E9\u05DA \uD83D\uDD04"];
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // \u2500\u2500 Show result \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -593,7 +599,7 @@ function showResult(result) {
   if (result.skipped) {
     hideCloze(); hideMasteryBanner();
     banner.className  = "result-banner visible fail";
-    icon.textContent  = "\u1F91D";
+    icon.textContent  = "\uD83E\uDD1D";
     title.textContent = pick(MSG_SKIP);
     sub.textContent   = "\u05E2\u05D5\u05D1\u05E8\u05D9\u05DD \u05DC\u05DE\u05E9\u05E4\u05D8 \u05D4\u05D1\u05D0...";
     waiting = true;
@@ -608,7 +614,7 @@ function showResult(result) {
       // Just finished cloze successfully
       hideCloze();
       banner.className  = "result-banner visible pass";
-      icon.textContent  = "\u1F9E9";
+      icon.textContent  = "\uD83E\uDDE9";
       title.textContent = "\u05D4\u05E9\u05DC\u05DE\u05EA \u05D0\u05EA \u05D4\u05DE\u05E9\u05E4\u05D8! " + pick(MSG_PASS);
       sub.textContent   = result.mastery_mode
         ? "\u05E2\u05DB\u05E9\u05D9\u05D5 \u05DC\u05D1\u05E0\u05D5\u05EA \u05D4\u05E8\u05D2\u05DC \u2014 " + result.mastery_target + " \u05E4\u05E2\u05DE\u05D9\u05DD \u05D1\u05E8\u05E6\u05E3"
@@ -625,7 +631,7 @@ function showResult(result) {
       // Still in cloze \u2014 wrong attempt
       showClozeBanner(result.cloze_word, result.cloze_attempts_left || 3);
       banner.className  = "result-banner visible fail";
-      icon.textContent  = "\u1F9E9";
+      icon.textContent  = "\uD83E\uDDE9";
       title.textContent = "\u05E9\u05DB\u05D7\u05EA \u05DE\u05D9\u05DC\u05D4 \u2014 " + pick(MSG_FAIL);
       sub.textContent   = "\u05E6\u05D9\u05D5\u05DF: " + score + "% \u2014 \u05D0\u05DE\u05D5\u05E8 \u05E9\u05D5\u05D1 \u05E2\u05DD \u05D4\u05DE\u05D9\u05DC\u05D4 \u05D4\u05D7\u05E1\u05E8\u05D4";
       document.getElementById("mic-label").textContent = "\u05D4\u05E7\u05E9 \u05DC\u05D3\u05D9\u05D1\u05D5\u05E8";
@@ -643,17 +649,17 @@ function showResult(result) {
 
     if (result.first_pass) {
       banner.className  = "result-banner visible pass";
-      icon.textContent  = "\u1F31F";
+      icon.textContent  = "\uD83C\uDF1F";
       title.textContent = pick(MSG_PASS) + " \u05E2\u05DB\u05E9\u05D9\u05D5 \u05DC\u05D1\u05E0\u05D5\u05EA \u05D4\u05E8\u05D2\u05DC!";
       sub.textContent   = "\u05D0\u05DE\u05D5\u05E8 \u05E0\u05DB\u05D5\u05DF " + target + " \u05E4\u05E2\u05DE\u05D9\u05DD \u05D1\u05E8\u05E6\u05E3.";
     } else if (broken) {
       banner.className  = "result-banner visible fail";
-      icon.textContent  = "\u1F499";
+      icon.textContent  = "\uD83D\uDC99";
       title.textContent = pick(MSG_BROKEN);
       sub.textContent   = "\u05E6\u05D9\u05D5\u05DF: " + score + "% \u2014 \u05D4\u05EA\u05D7\u05DC \u05E8\u05E6\u05E3 \u05DE\u05D7\u05D3\u05E9.";
     } else if (passed) {
       banner.className  = "result-banner visible pass";
-      icon.textContent  = "\u1F525";
+      icon.textContent  = "\uD83D\uDD25";
       title.textContent = consecutive + "/" + target + " \u05D1\u05E8\u05E6\u05E3! " + pick(MSG_STREAK);
       sub.textContent   = "\u05E2\u05D5\u05D3 " + (target - consecutive) + " \u05E4\u05E2\u05DE\u05D9\u05DD \u05D1\u05E8\u05E6\u05E3.";
       if (consecutive >= 2) launchConfetti();
@@ -664,7 +670,7 @@ function showResult(result) {
     if (result.advance) {
       launchConfetti(); hideMasteryBanner();
       banner.className  = "result-banner visible pass";
-      icon.textContent  = "\u1F3C6";
+      icon.textContent  = "\uD83C\uDFC6";
       title.textContent = pick(MSG_MASTERY);
       sub.textContent   = "\u05E2\u05D5\u05D1\u05E8\u05D9\u05DD \u05DC\u05DE\u05E9\u05E4\u05D8 \u05D4\u05D1\u05D0...";
       waiting = true;
@@ -682,7 +688,7 @@ function showResult(result) {
     // First pass \u2014 enter cloze
     showClozeBanner(result.cloze_word, 3);
     banner.className  = "result-banner visible pass";
-    icon.textContent  = "\u1F31F";
+    icon.textContent  = "\uD83C\uDF1F";
     title.textContent = pick(MSG_PASS) + " \u2014 \u05E2\u05DB\u05E9\u05D9\u05D5 \u05D4\u05E9\u05DC\u05DD \u05DE\u05D9\u05DC\u05D4 \u05D7\u05E1\u05E8\u05D4";
     sub.textContent   = "\u05D0\u05DE\u05D5\u05E8 \u05D0\u05EA \u05D4\u05DE\u05E9\u05E4\u05D8 \u05E9\u05D5\u05D1 \u05DB\u05D5\u05DC\u05DC \u05D4\u05DE\u05D9\u05DC\u05D4 \u05D4\u05D7\u05E1\u05E8\u05D4";
     document.getElementById("english-ref").style.opacity = "1";
@@ -692,12 +698,12 @@ function showResult(result) {
   if (passed) {
     launchConfetti();
     banner.className  = "result-banner visible pass";
-    icon.textContent  = "\u1F389";
+    icon.textContent  = "\uD83C\uDF89";
     title.textContent = pick(MSG_PASS);
     sub.textContent   = "\u05E6\u05D9\u05D5\u05DF: " + score + "% \u2014 \u05E2\u05D5\u05D1\u05E8\u05D9\u05DD \u05D4\u05DC\u05D0\u05D4...";
   } else {
     banner.className  = "result-banner visible fail";
-    icon.textContent  = "\u1F4AA";
+    icon.textContent  = "\uD83D\uDCAA";
     title.textContent = pick(MSG_FAIL);
     sub.textContent   = "\u05E6\u05D9\u05D5\u05DF: " + score + "% \u2014 \u05E6\u05E8\u05D9\u05DA " + result.threshold + "% \u05DC\u05E2\u05D1\u05D5\u05E8.";
   }
@@ -741,7 +747,7 @@ function startExamMode(practiceData) {
   // Build exam sentence list from practice results
   examSentences = practiceData
     .filter(function(r) { return !r.skipped; })
-    .map(function(r) { return { he: null, en: r.sentence }; });
+    .map(function(r) { return { he: questionMap[r.sentence] || null, en: r.sentence }; });
 
   if (!examSentences.length) {
     showFinalReport(practiceData, []);
@@ -761,7 +767,7 @@ function startExamMode(practiceData) {
 
 function buildExamIntroHTML(count) {
   return '<div style="text-align:center;padding:20px 0">' +
-    '<div style="font-size:52px;margin-bottom:12px">\u1F393</div>' +
+    '<div style="font-size:52px;margin-bottom:12px">\uD83C\uDF93</div>' +
     '<h2 style="font-size:22px;font-weight:800;color:#4318D1;margin-bottom:10px">\u05DE\u05D1\u05D7\u05DF \u05E1\u05D9\u05DB\u05D5\u05DD</h2>' +
     '<p style="font-size:15px;color:#555;margin-bottom:8px">\u05EA\u05D0\u05DE\u05E8 \u05D0\u05EA ' + count + ' \u05D4\u05DE\u05E9\u05E4\u05D8\u05D9\u05DD \u05E9\u05DC\u05DE\u05D3\u05EA \u05D1\u05E8\u05E6\u05E3.</p>' +
     '<p style="font-size:13px;color:#888;margin-bottom:28px">\u05DC\u05D0 \u05EA\u05E7\u05D1\u05DC \u05E4\u05D9\u05D3\u05D1\u05E7 \u05EA\u05D5\u05DA \u05DB\u05D3\u05D9 \u2014 \u05E8\u05E7 \u05E0\u05D9\u05EA\u05D5\u05D7 \u05DE\u05DC\u05D0 \u05D1\u05E1\u05D5\u05E3.</p>' +
@@ -787,7 +793,7 @@ function runExamQuestion() {
       '<div style="background:#ddd;border-radius:20px;height:6px;margin-bottom:18px">' +
         '<div style="background:#4318D1;height:6px;border-radius:20px;width:' + pct + '%;transition:width .4s"></div>' +
       '</div>' +
-      '<div class="hebrew-label">\u05E7\u05E8\u05D0 \u05D1\u05D0\u05E0\u05D2\u05DC\u05D9\u05EA:</div>' +
+      '<div class="hebrew-label">\u05EA\u05E8\u05D2\u05DD \u05DC\u05D0\u05E0\u05D2\u05DC\u05D9\u05EA:</div>' +
       '<div class="hebrew-text" id="exam-he" style="direction:rtl;text-align:right">' +
         (q.he || "\u2014") + '</div>' +
       '<div id="exam-spoken" style="font-size:14px;color:#888;min-height:22px;margin:10px 0"></div>' +
@@ -798,10 +804,6 @@ function runExamQuestion() {
       '<button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="skipExamQuestion()">\u05D3\u05DC\u05D2 \u05E2\u05DC \u05DE\u05E9\u05E4\u05D8 \u05D6\u05D4</button>' +
     '</div>';
 
-  // No Hebrew in exam (it's the challenge)
-  if (!q.he) {
-    document.getElementById("exam-he").textContent = "\u2014 \u05D0\u05D9\u05DF \u05EA\u05E8\u05D2\u05D5\u05DD \u2014 \u05D3\u05D1\u05E8 \u05DE\u05D4 \u05E9\u05D0\u05EA\u05D4 \u05D6\u05D5\u05DB\u05E8";
-  }
 }
 
 function startExamRecognition() {
@@ -923,7 +925,7 @@ function showFinalReport(practiceData, examData) {
 
   done.innerHTML =
     '<div style="text-align:center;padding:8px 0 16px">' +
-      '<div style="font-size:48px;margin-bottom:8px">\u1F393</div>' +
+      '<div style="font-size:48px;margin-bottom:8px">\uD83C\uDF93</div>' +
       '<h2 style="font-size:24px;font-weight:800;color:#4318D1;margin-bottom:4px">\u05E1\u05D9\u05D5\u05DD \u05E1\u05E9\u05DF \u2014 ' + studentName + '</h2>' +
       '<p style="font-size:13px;color:#888;margin-bottom:20px">\u05EA\u05E8\u05D2\u05D5\u05DC + \u05DE\u05D1\u05D7\u05DF</p>' +
 
@@ -990,17 +992,8 @@ function launchConfetti() {
 // \u2500\u2500 Reset session \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function resetSession() {
   studentId = studentName + "_" + Date.now();
-  examMode = false; examIndex = 0; examResults = []; practiceResults = [];
+  examMode = false; examIndex = 0; examResults = []; practiceResults = []; questionMap = {};
   fetch("/reset", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({student: studentId})
-  }).then(function() {
-    document.getElementById("main-card").style.display = "block";
-    document.getElementById("done-card").style.display = "none";
-    loadQuestion();
-  });
-}
-</script>
-</body>
-</html>

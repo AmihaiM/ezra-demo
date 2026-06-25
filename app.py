@@ -150,8 +150,19 @@ def detect_cloze_word(sentence):
     if len(words) < 3:
         return None
     # Prefer a verb (skip first word, usually "I" or "The")
-    for w in words[1:]:
+    # Check base form AND common conjugations: used→use, loves→love, working→work
+    def is_verb(w):
         if w in COMMON_VERBS:
+            return True
+        if w.endswith('ed') and (w[:-2] in COMMON_VERBS or w[:-1] in COMMON_VERBS):
+            return True   # walked→walk, used→use
+        if w.endswith('ing') and w[:-3] in COMMON_VERBS:
+            return True   # working→work
+        if w.endswith('s') and w[:-1] in COMMON_VERBS:
+            return True   # works→work
+        return False
+    for w in words[1:]:
+        if is_verb(w):
             return w
     # Fallback: longest non-trivial word (not first or last)
     candidates = [(len(w), w) for w in words[1:-1] if len(w) > 4]
@@ -487,17 +498,4 @@ def teacher_data():
 
 
 @app.route("/score-only", methods=["POST"])
-def score_only():
-    """Exam mode: score without affecting session state."""
-    data    = request.get_json(force=True)
-    spoken  = data.get("spoken", "")
-    correct = data.get("correct", "")
-    score   = similarity(spoken, correct)
-    passed  = score >= PASS_THRESHOLD
-    words   = word_level(spoken, correct)
-    return jsonify(score=score, passed=passed, words=words, threshold=PASS_THRESHOLD)
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+def sco
