@@ -498,4 +498,17 @@ def teacher_data():
 
 
 @app.route("/score-only", methods=["POST"])
-def sco
+def score_only():
+    """Exam mode: score without affecting session state."""
+    data    = request.get_json(force=True)
+    spoken  = data.get("spoken", "")
+    correct = data.get("correct", "")
+    score   = similarity(spoken, correct)
+    passed  = score >= PASS_THRESHOLD
+    words   = word_level(spoken, correct)
+    return jsonify(score=score, passed=passed, words=words, threshold=PASS_THRESHOLD)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
