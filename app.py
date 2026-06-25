@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, make_response, session, redirect
+from flask import Flask, jsonify, request, make_response, session, redirect, Response
 from difflib import SequenceMatcher
 import json, re, os
 from datetime import datetime
@@ -412,9 +412,9 @@ def reset():
 
 @app.route("/")
 def home():
-    r = make_response(open(os.path.join(BASE_DIR, "index.html"), encoding="utf-8").read())
-    r.headers["Content-Type"] = "text/html; charset=utf-8"
-    return r
+    with open(os.path.join(BASE_DIR, "index.html"), "rb") as f:
+        content = f.read()
+    return Response(content, content_type="text/html; charset=utf-8")
 
 
 # ── Auth: student password check ─────────────────────────────
@@ -443,9 +443,7 @@ def teacher_login():
 
     path = os.path.join(BASE_DIR, "teacher_login.html")
     html = open(path, encoding="utf-8").read().replace("{{ERROR}}", error)
-    r = make_response(html)
-    r.headers["Content-Type"] = "text/html; charset=utf-8"
-    return r
+    return Response(html.encode("utf-8"), content_type="text/html; charset=utf-8")
 
 
 @app.route("/teacher-logout")
@@ -459,9 +457,9 @@ def teacher():
     if not session.get("teacher"):
         return redirect("/teacher-login")
     path = os.path.join(BASE_DIR, "teacher.html")
-    r = make_response(open(path, encoding="utf-8").read())
-    r.headers["Content-Type"] = "text/html; charset=utf-8"
-    return r
+    with open(path, "rb") as f:
+        content = f.read()
+    return Response(content, content_type="text/html; charset=utf-8")
 
 
 @app.route("/teacher/data")
