@@ -412,7 +412,9 @@ def reset():
 
 @app.route("/")
 def home():
-    return app.send_static_file("index.html")
+    with open(os.path.join(BASE_DIR, "index.html"), "rb") as f:
+        content = f.read()
+    return Response(content, content_type="text/html; charset=utf-8")
 
 
 # ── Auth: student password check ─────────────────────────────
