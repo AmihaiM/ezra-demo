@@ -269,7 +269,7 @@ header p  { font-size:11px; opacity:.7; margin-top:1px; }
   <div id="cloze-banner" style="display:none;background:#e0f2fe;border:2px solid #0284c7;
        border-radius:14px;padding:16px 18px;margin-top:14px">
     <h3 style="font-size:15px;font-weight:700;color:#0369a1;margin-bottom:4px">
-      &#129513; &#1488;&#1502;&#1493;&#1512; &#1488;&#1514; &#1492;&#1502;&#1513;&#1508;&#1496; &#1492;&#1502;&#1500;&#1488;
+      &#129513; &#1488;&#1502;&#1493;&#1512; &#1488;&#1514; &#1492;&#1502;&#1513;&#1508;&#1496; &#1506;&#1501; &#1492;&#1502;&#1497;&#1500;&#1492; &#1492;&#1495;&#1505;&#1512;&#1492;
     </h3>
     <p id="cloze-msg" style="font-size:13px;color:#075985;margin-bottom:8px">
       &#1488;&#1502;&#1493;&#1512; &#1488;&#1514; &#1492;&#1502;&#1513;&#1508;&#1496; &#1506;&#1501; &#1492;&#1502;&#1497;&#1500;&#1492; &#1492;&#1495;&#1505;&#1512;&#1492;
@@ -997,3 +997,10 @@ function resetSession() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({student: studentId})
+  }).then(function() {
+    document.getElementById("main-card").style.display = "block";
+    document.getElementById("done-card").style.display = "none";
+    loadQuestion();
+  });
+}
+</scri
